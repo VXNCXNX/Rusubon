@@ -1,0 +1,17 @@
+Rusubon
+Copyright 2026 Vincent
+
+This product is not made by, endorsed by, or affiliated with PostHog Inc.
+It is designed to work with PostHog as a data warehouse.
+
+Portions of the bundled scout skills (anatomy, HogQL footguns, decide/memory
+conventions) are adapted from files published by PostHog Inc. under the MIT
+Expat license in the PostHog/posthog repository, including:
+
+  products/signals/skills/signals-scout-session-replay/SKILL.md
+  products/signals/skills/signals-scout-replay-vision/SKILL.md
+  products/signals/skills/authoring-scouts/references/*
+
+The original MIT notice is in LICENSE-PostHog-MIT.
+
+Rusubon does not include any code from the PostHog `ee/` directory.

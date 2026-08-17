@@ -1,0 +1,7 @@
+{
+  "posthog": {
+    "projectId": "YOUR_PROJECT_ID",
+    "host": "https://us.posthog.com"
+  },
+  "runner": "claude"
+}
