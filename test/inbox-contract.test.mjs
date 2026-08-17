@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { afterEach, test } from "node:test";
 import { takeOption } from "../src/argv.mjs";
 import { main } from "../src/cli.mjs";
+import {
+  parseCandidates,
+  shouldRunPhase2,
+} from "../src/candidates.mjs";
 import { POSTHOG_CLOUD, initConfig, loadConfig, resolveHost } from "../src/config.mjs";
 import { PLACEHOLDER, assertContextReady } from "../src/context.mjs";
 import { decline } from "../src/decline.mjs";
@@ -80,6 +84,8 @@ test("init scaffolds .rusubon and never writes .mcp.json", () => {
   assert.match(gi, /\.rusubon\/runs\//);
   assert.equal(loadConfig().runner, "claude");
   assert.equal(loadConfig().posthog.host, "YOUR_REGION");
+  assert.equal(loadConfig().read.effort, "low");
+  assert.equal(loadConfig().read.model, "");
 });
 
 test("resolveHost accepts us or eu, nothing else", () => {
@@ -147,8 +153,37 @@ test("buildPrompt injects context and memory index", () => {
   assert.match(prompt, /\.rusubon\/inbox\/reports/);
   assert.match(prompt, /priority: P1\|P2\|P3/);
   assert.match(prompt, /templates\/report\.md/);
+  assert.match(prompt, /PHASE 1/);
+  assert.match(prompt, /friction-candidates\.json/);
   assert.doesNotMatch(prompt, /scratchpad\.md/);
   assert.doesNotMatch(prompt, /inbox\/findings/);
+});
+
+test("phase 2 prompt gets candidates; shouldRunPhase2 is Claude-only", () => {
+  tmp();
+  initConfig();
+  fillContext();
+  const candidates = parseCandidates({
+    windowDays: 7,
+    ids: [
+      { sessionId: "aaa", signals: 3, paths: ["/checkout"] },
+      { id: "bbb", signals: 9, paths: ["/pricing"] },
+      { sessionId: "", signals: 99 },
+    ],
+  });
+  assert.deepEqual(
+    candidates.ids.map((r) => r.sessionId),
+    ["bbb", "aaa"],
+  );
+  const cfg = { posthog: { projectId: "123", host: "https://us.posthog.com" }, runner: "claude" };
+  const p2 = buildPrompt(loadSkill("friction"), cfg, { phase: 2, candidates });
+  assert.match(p2, /PHASE 2/);
+  assert.match(p2, /sub-agents/);
+  assert.match(p2, /"sessionId": "bbb"/);
+  assert.equal(shouldRunPhase2(cfg, candidates, "# ok\n"), true);
+  assert.equal(shouldRunPhase2({ ...cfg, runner: "cursor" }, candidates, "# ok\n"), false);
+  assert.equal(shouldRunPhase2(cfg, { ids: [] }, "# ok\n"), false);
+  assert.equal(shouldRunPhase2(cfg, candidates, "no PostHog tools\n"), false);
 });
 
 test("inbox lists P1 before P3 as priority slug title", () => {

@@ -55,6 +55,10 @@ export function loadConfig() {
       host: resolveHost(hostRaw) || hostRaw,
     },
     runner: raw.runner || DEFAULT_CONFIG.runner,
+    read: {
+      model: String(raw.read?.model || "").trim(),
+      effort: String(raw.read?.effort || "low").trim() || "low",
+    },
   };
 }
 

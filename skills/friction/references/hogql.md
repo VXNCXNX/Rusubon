@@ -86,6 +86,43 @@ GROUP BY tag
 ORDER BY sessions_7d DESC
 ```
 
+## Qualified sessions (phase 1 candidates)
+
+Replace the `LIKE` list with **this product's** money paths from context.md. Window: 7d. Cheap signals: `$rageclick`, `$dead_click`, `$exception`, `$recording_observed`.
+
+```sql
+SELECT
+  properties.$session_id AS session_id,
+  count() AS signals,
+  groupUniqArray(replaceRegexpAll(properties.$pathname, '[0-9a-fA-F-]{8,}', ':id')) AS paths,
+  max(timestamp) AS last_signal_at
+FROM events
+WHERE timestamp >= now() - INTERVAL 7 DAY AND timestamp <= now() + INTERVAL 1 DAY
+  AND properties.$session_id IS NOT NULL
+  AND event IN ('$rageclick', '$dead_click', '$exception', '$recording_observed')
+  AND (properties.$pathname LIKE '%/checkout%'
+    OR properties.$pathname LIKE '%/pricing%'
+    OR properties.$pathname LIKE '%/signup%'
+    OR properties.$pathname LIKE '%/billing%')
+GROUP BY session_id
+ORDER BY signals DESC
+LIMIT 400
+```
+
+## Session events (phase 2, one id or a small IN list)
+
+```sql
+SELECT event, timestamp, properties.$pathname AS path,
+       properties.$el_text AS el_text, person_id
+FROM events
+WHERE properties.$session_id = 'SESSION_ID'
+  AND timestamp >= now() - INTERVAL 7 DAY AND timestamp <= now() + INTERVAL 1 DAY
+ORDER BY timestamp
+LIMIT 200
+```
+
+Console / click counts: `session-recording-get` if the MCP has it. Do not invent event names.
+
 ## Money paths
 
 Replace the `LIKE` list with the paths this product actually cares about.

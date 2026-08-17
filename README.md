@@ -47,6 +47,8 @@ rusubon decline <slug> --why "intentional EU checkout gate"
 rusubon remember pattern/capture-baseline still quiet week of …
 ```
 
+`run` on Claude is two passes: SQL first (capture / Vision), then a low-effort read of sessions that hit a money path *and* a cheap signal (rage, dead click, exception, Vision tag). Sub-agents scan those ids in parallel. The parent writes 0–3 reports. Cap 100 sessions or 45 minutes. Cursor and Codex stop after SQL.
+
 `run` ends with a harness block (duration, `mcp=ok|missing`, reports, memory writes, close-out) and the inbox. Read a finding with `show`. Archive it with `decline --why`.
 
 ## Layout (after init)
@@ -67,11 +69,14 @@ rusubon.json                       # committed: projectId + host (us|eu) + runne
 ```json
 {
   "posthog": { "projectId": "YOUR_PROJECT_ID", "host": "YOUR_REGION" },
-  "runner": "claude"
+  "runner": "claude",
+  "read": { "effort": "low" }
 }
 ```
 
 `host` is `us` or `eu` (or `https://us.posthog.com` / `https://eu.posthog.com`). Match the region the project lives in. There is no default.
+
+`read.effort` / `read.model` apply to the session-read pass only (Claude). Omit `read.model` to keep the CLI default model.
 
 | `runner` | What it uses | Bills |
 | --- | --- | --- |

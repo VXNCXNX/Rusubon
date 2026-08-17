@@ -3,6 +3,7 @@
 Local scout harness. Inbox is files in the product repo. PostHog is the warehouse via the official MCP. The runner is the user's Claude / Cursor / Codex login.
 
 - Findings are `requires_human_input`. Reports carry `P1`/`P2`/`P3` + `priority_explanation`. No auto-merge. No auto-PR. No Linear/GitHub issue.
+- `rusubon run friction` on Claude is two phases: SQL (cliff / watch-gap / candidates), then a cheap/low read of qualified sessions via parallel sub-agents. Only the parent writes the inbox. Money-path clusters are phase 2 only. Cursor/Codex stay phase 1.
 - `rusubon run` refuses if `.rusubon/context.md` is missing or still a placeholder, or if `rusubon doctor` fails (projectId, host us|eu, runner login, official PostHog MCP).
 - After a run the harness prints duration, mcp=, reports, memory writes, and the close-out path — then the inbox (`P2  slug  title`). `rusubon show <slug>` prints a report.
 - Official PostHog MCP only. Missing tools → close-out starts with `no PostHog tools`, emit nothing.

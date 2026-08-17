@@ -77,6 +77,21 @@ Do not file if the shape is in `context.md` intentional friction, or a `noise:` 
 
 `rusubon inbox` prints `P2  slug  title`, P1 first.
 
+## Friction run (two phases)
+
+`rusubon run friction` is a command you start. No cron. Leave the laptop open.
+
+On **Claude**, the harness runs the skill twice:
+
+1. **Phase 1 (SQL)** — capture cliff (P1), Vision watch-gap (P3), `not-in-use`. Writes `.rusubon/runs/YYYY-MM-DD-friction-candidates.json`. Does **not** file a money-path cluster.
+2. **Phase 2 (read)** — only if that file has ids. Second Claude process (`read.effort` default `low`, optional `read.model` in `rusubon.json`). Parent spawns sub-agents (~10 ids each). Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor: `.rusubon/memory/dedupe/friction-session-cursor.md`. Skip an id until a newer cheap signal.
+
+Qualified id: money path from `context.md` in the last 7 days, plus `$rageclick` / `$dead_click` / `$exception` / `$recording_observed`. Sort by signal count. Read events + console + replay **metadata** MCP tools if present. No video. No new Vision scanner.
+
+**Cursor / Codex:** phase 1 only. Candidates stay unread.
+
+P2 volume gates stay: ≥5 persons / ≥10 sessions.
+
 ## Official PostHog MCP
 
 The scout uses the official PostHog MCP (`execute-sql` / HogQL). No Composio, no Rusubon HTTP client, no `phc_` tokens in files.
@@ -91,7 +106,7 @@ If those tools are not available in the runner session, write a close-out that s
 | --- | --- | --- |
 | `rusubon init` | you | scaffold + gitignore inbox/runs |
 | `rusubon doctor` | you | preflight (context, projectId, host us\|eu, runner, MCP) |
-| `rusubon run friction` | you | manual scout; harness prints the summary, then inbox |
+| `rusubon run friction` | you | two-phase scout on Claude (SQL then session read); then inbox |
 | `rusubon inbox` | you | list open reports |
 | `rusubon show <slug>` | you | print a report (open or archived) |
 | `rusubon remember prefix/slug …` | you or agent | upsert memory file |

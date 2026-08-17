@@ -3,5 +3,8 @@
     "projectId": "YOUR_PROJECT_ID",
     "host": "YOUR_REGION"
   },
-  "runner": "claude"
+  "runner": "claude",
+  "read": {
+    "effort": "low"
+  }
 }

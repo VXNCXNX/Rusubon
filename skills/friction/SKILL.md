@@ -14,7 +14,44 @@ You are a session-replay scout. Adapted from PostHog's `signals-scout-session-re
 
 Findings are **investigations** (`requires_human_input`). Never open a PR from this skill. If a finding later has a concrete code cause, hand off to the `research` skill (manual, after this run).
 
-Do not create Replay Vision scanners. Do not call `vision-scanners-create` or session-summary generation.
+Do not create Replay Vision scanners. Do not call `vision-scanners-create` or session-summary generation. Do not watch video / frames.
+
+The harness runs this skill in **two phases** on Claude (`rusubon run friction`). Cursor/Codex get phase 1 only.
+
+## Phase 1 — SQL
+
+Capture + Vision roster + qualify. Write `.rusubon/runs/YYYY-MM-DD-friction-candidates.json` even if `ids` is `[]`.
+
+You may file: P1 capture cliff, P3 Vision watch-gap, `not-in-use`. **Do not file a money-path cluster.** That is phase 2.
+
+Qualified session: hit a **context.md money path** in the last 7d, **and** at least one cheap signal (`$rageclick`, `$dead_click`, `$exception`, `$recording_observed` tag). Sort by signal count desc. Skip an id in `dedupe/friction-session-cursor` unless `lastSignalAt` is newer than `lastRead`.
+
+```json
+{
+  "windowDays": 7,
+  "ids": [
+    {
+      "sessionId": "…",
+      "signals": 12,
+      "paths": ["/checkout"],
+      "lastSignalAt": "2026-08-17T10:00:00Z"
+    }
+  ]
+}
+```
+
+## Phase 2 — read (Claude parent + sub-agents)
+
+The harness starts a second Claude process (`--effort low`, or `read.model` / `read.effort` in `rusubon.json`) and pastes the candidates.
+
+1. Read `.rusubon/memory/dedupe/friction-session-cursor.md` if it exists. Apply the skip rule again.
+2. Take at most **100** remaining ids (already worst-first). Stop at **45 minutes**.
+3. Spawn **sub-agents in parallel**, ~10 ids each. Each sub-agent: HogQL events + console for those `session_id`s; `session-recording-get` / `query-session-recordings-list` if present (metadata only). Return notes: path, stuck moment, person, ids. **Sub-agents do not write inbox, candidates, cursor, or close-out.**
+4. You cluster. File 0–3 reports. P2 still needs ≥5 persons / ≥10 sessions. Copy `templates/report.md`.
+5. Upsert the cursor (`dedupe/friction-session-cursor`): each read id + `lastRead` (today) + `lastSignalAt`. If you hit the cap, say so in the close-out — next run continues.
+6. Rewrite the close-out.
+
+If Task/sub-agents are missing, read sequentially. Do not invent a second harness.
 
 ## Quick close-out
 
@@ -78,11 +115,11 @@ Do not file if:
 
 A report-worthy note copies `templates/report.md`. Required: `#` title, `priority: P1|P2|P3`, `priority_explanation` (one sentence with a number), `actionability: requires_human_input`. Names the path, quantifies the step vs its baseline, passes volume gates, dates onset, links 2–3 recording ids.
 
-| Priority | File when |
-| --- | --- |
-| P1 | Capture cliff — ratio vs 14d norm, traffic held, no matching Team config edit |
-| P2 | Corroborated money-path cluster on a context.md URL, persons ≥ 5 |
-| P3 | Vision watch-gap (`obs_7d` collapsed, recordings still flow). Do not create a scanner. |
+| Priority | File when | Who |
+| --- | --- | --- |
+| P1 | Capture cliff — ratio vs 14d norm, traffic held, no matching Team config edit | Phase 1 |
+| P2 | Corroborated money-path cluster on a context.md URL, persons ≥ 5, **after reading** the qualified sessions | Phase 2 only |
+| P3 | Vision watch-gap (`obs_7d` collapsed, recordings still flow). Do not create a scanner. | Phase 1 |
 
 Do not file P0 or P4. The file is the issue. Do not open Linear, GitHub, or a PR.
 

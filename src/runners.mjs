@@ -15,6 +15,12 @@ function writePrompt(prompt) {
   return file;
 }
 
+function spawnOpts(opts, extra = {}) {
+  const out = { cwd: process.cwd(), ...extra };
+  if (opts.timeoutMs > 0) out.timeout = opts.timeoutMs;
+  return out;
+}
+
 export const RUNNERS = {
   claude: {
     which: () => which("claude"),
@@ -25,46 +31,41 @@ export const RUNNERS = {
         );
       }
     },
-    run(prompt) {
+    run(prompt, opts = {}) {
       this.warn();
       writePrompt(prompt);
       const bin = process.env.RUSUBON_CLAUDE || "claude";
-      return spawnSync(
-        bin,
-        ["-p", prompt, "--permission-mode", "bypassPermissions", "--add-dir", pkgRoot()],
-        {
-          stdio: "inherit",
-          cwd: process.cwd(),
-        },
-      );
+      const args = ["-p", prompt, "--permission-mode", "bypassPermissions", "--add-dir", pkgRoot()];
+      if (opts.model) args.push("--model", opts.model);
+      if (opts.effort) args.push("--effort", opts.effort);
+      return spawnSync(bin, args, spawnOpts(opts, { stdio: "inherit" }));
     },
   },
   cursor: {
     which: () => which("cursor") || which("agent"),
-    run(prompt) {
+    run(prompt, opts = {}) {
       const bin = which("agent") ? "agent" : "cursor";
       const file = writePrompt(prompt);
-      return spawnSync(bin, ["-p", "--force", file], {
-        stdio: "inherit",
-        cwd: process.cwd(),
-        env: process.env,
-      });
+      return spawnSync(bin, ["-p", "--force", file], spawnOpts(opts, { stdio: "inherit", env: process.env }));
     },
   },
   codex: {
     which: () => which("codex"),
-    run(prompt) {
+    run(prompt, opts = {}) {
       const file = writePrompt(prompt);
-      return spawnSync("codex", ["exec", "--skip-git-repo-check", "-"], {
-        input: prompt + `\n\n(prompt also at ${file})\n`,
-        stdio: ["pipe", "inherit", "inherit"],
-        cwd: process.cwd(),
-      });
+      return spawnSync(
+        "codex",
+        ["exec", "--skip-git-repo-check", "-"],
+        spawnOpts(opts, {
+          input: prompt + `\n\n(prompt also at ${file})\n`,
+          stdio: ["pipe", "inherit", "inherit"],
+        }),
+      );
     },
   },
 };
 
-export function runWith(runnerName, prompt) {
+export function runWith(runnerName, prompt, opts = {}) {
   const runner = RUNNERS[runnerName];
   if (!runner) {
     throw new Error(`unknown runner: ${runnerName}. use claude | cursor | codex`);
@@ -78,7 +79,12 @@ export function runWith(runnerName, prompt) {
   const shown = runnerName === "claude" && process.env.RUSUBON_CLAUDE
     ? process.env.RUSUBON_CLAUDE
     : bin;
-  console.log(`runner: ${runnerName} (${shown})`);
-  const result = runner.run(prompt);
-  return { status: result.status ?? 1, bin: shown };
+  const bits = [`runner: ${runnerName} (${shown})`];
+  if (opts.phase) bits.push(`phase ${opts.phase}`);
+  if (opts.model) bits.push(`model=${opts.model}`);
+  if (opts.effort) bits.push(`effort=${opts.effort}`);
+  console.log(bits.join("  "));
+  const result = runner.run(prompt, opts);
+  const timedOut = result.error?.code === "ETIMEDOUT" || result.signal === "SIGTERM";
+  return { status: timedOut ? 0 : (result.status ?? 1), bin: shown, timedOut };
 }
