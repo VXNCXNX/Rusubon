@@ -76,7 +76,15 @@ Do not file if:
 - a `noise/` or `dedupe/` key already covers it
 - volume gates fail
 
-A report-worthy note names the path, quantifies the step vs its baseline, passes volume gates, dates onset, and links 2–3 recording ids. `actionability=requires_human_input`. Priority: capture cliff P1–P2; corroborated money-path cluster P2; Vision watch-gap P3.
+A report-worthy note copies `templates/report.md`. Required: `#` title, `priority: P1|P2|P3`, `priority_explanation` (one sentence with a number), `actionability: requires_human_input`. Names the path, quantifies the step vs its baseline, passes volume gates, dates onset, links 2–3 recording ids.
+
+| Priority | File when |
+| --- | --- |
+| P1 | Capture cliff — ratio vs 14d norm, traffic held, no matching Team config edit |
+| P2 | Corroborated money-path cluster on a context.md URL, persons ≥ 5 |
+| P3 | Vision watch-gap (`obs_7d` collapsed, recordings still flow). Do not create a scanner. |
+
+Do not file P0 or P4. The file is the issue. Do not open Linear, GitHub, or a PR.
 
 Then stop. Do not start `research` unless a human launches it after a note that names a file/component.
 

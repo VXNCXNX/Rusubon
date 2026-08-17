@@ -52,7 +52,7 @@ rusubon remember pattern/capture-baseline still quiet week of …
 ## Layout (after init)
 
 ```
-rusubon.json                       # committed: projectId + runner
+rusubon.json                       # committed: projectId + host (us|eu) + runner
 .rusubon/context.md                # committed: you write this
 .rusubon/memory/<prefix>/<slug>.md # committed: scout + decline why
 .rusubon/inbox/reports/*.md        # gitignored: open findings
@@ -66,10 +66,12 @@ rusubon.json                       # committed: projectId + runner
 
 ```json
 {
-  "posthog": { "projectId": "YOUR_PROJECT_ID", "host": "https://us.posthog.com" },
+  "posthog": { "projectId": "YOUR_PROJECT_ID", "host": "YOUR_REGION" },
   "runner": "claude"
 }
 ```
+
+`host` is `us` or `eu` (or `https://us.posthog.com` / `https://eu.posthog.com`). Match the region the project lives in. There is no default.
 
 | `runner` | What it uses | Bills |
 | --- | --- | --- |

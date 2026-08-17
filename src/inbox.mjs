@@ -3,6 +3,24 @@ import { join } from "node:path";
 import { reportSlug } from "./decline.mjs";
 import { archiveDir, cwd, reportsDir } from "./paths.mjs";
 
+const RANK = { P1: 0, P2: 1, P3: 2 };
+
+export function parseReport(text, fallbackTitle = "") {
+  const title = ((text.match(/^#\s+(.+)/m) || [, fallbackTitle])[1] || "").trim();
+  const priority = ((text.match(/^priority:\s*(P[123])\s*$/im) || [])[1] || "").toUpperCase();
+  const priorityExplanation = ((text.match(/^priority_explanation:\s*(.+)$/im) || [])[1] || "").trim();
+  const actionability = ((text.match(/^actionability:\s*(\S+)/im) || [])[1] || "").trim();
+  return { title, priority, priorityExplanation, actionability };
+}
+
+export function inboxSlug(path) {
+  return path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
+}
+
+export function formatInboxLine(item) {
+  return `${item.priority || "—"}  ${inboxSlug(item.path)}  ${item.title}`;
+}
+
 export function listInbox() {
   const dir = reportsDir();
   if (!existsSync(dir)) return [];
@@ -13,10 +31,15 @@ export function listInbox() {
     const st = statSync(path);
     if (!st.isFile()) continue;
     const text = readFileSync(path, "utf8");
-    const title = (text.match(/^#\s+(.+)/m) || [, name])[1];
-    out.push({ path, title, mtime: st.mtimeMs });
+    const parsed = parseReport(text, name);
+    out.push({ path, mtime: st.mtimeMs, ...parsed });
   }
-  return out.sort((a, b) => b.mtime - a.mtime);
+  return out.sort((a, b) => {
+    const ra = RANK[a.priority] ?? 9;
+    const rb = RANK[b.priority] ?? 9;
+    if (ra !== rb) return ra - rb;
+    return b.mtime - a.mtime;
+  });
 }
 
 export function printInbox(items) {
@@ -24,13 +47,8 @@ export function printInbox(items) {
     console.log("inbox empty.");
     return;
   }
-  const root = cwd() + "/";
-  for (const item of items) {
-    const rel = item.path.startsWith(root) ? item.path.slice(root.length) : item.path;
-    const slug = item.path.slice(item.path.lastIndexOf("/") + 1).replace(/\.md$/, "");
-    console.log(`${rel}\n  ${item.title}\n  rusubon show ${slug}`);
-  }
-  console.log("rusubon decline <slug> --why \"…\"  to archive");
+  for (const item of items) console.log(formatInboxLine(item));
+  console.log('rusubon show <slug>   rusubon decline <slug> --why "…"');
 }
 
 export function showReport(raw) {

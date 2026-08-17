@@ -7,7 +7,7 @@ Rusubon copies PostHog Inbox as a file tree in the **product** repo. No UI. Trig
 Created by `rusubon init` in the product repo:
 
 ```
-rusubon.json                       # committed — projectId + runner
+rusubon.json                       # committed — projectId + host (us|eu) + runner
 .rusubon/context.md                # committed — you write this
 .rusubon/memory/<prefix>/<slug>.md # committed — scout + decline why
 .rusubon/inbox/reports/*.md        # gitignored — open findings
@@ -28,7 +28,7 @@ Required sections:
 3. Intentional friction — paywall, region, loading, checkout: do **not** file as bugs
 4. Out of scope (staging, internal)
 
-`rusubon run` refuses while the placeholder marker `RUSUBON_CONTEXT_PLACEHOLDER` is still in the file, or if `rusubon doctor` fails (projectId still a placeholder, runner missing / not logged in, no official PostHog MCP on the runner). No HTTP call to PostHog — doctor only inspects local files and the runner CLI.
+`rusubon run` refuses while the placeholder marker `RUSUBON_CONTEXT_PLACEHOLDER` is still in the file, or if `rusubon doctor` fails (projectId or host still a placeholder, host not `us`/`eu`, runner missing / not logged in, no official PostHog MCP on the runner). No HTTP call to PostHog — doctor only inspects local files and the runner CLI.
 
 ## Memory
 
@@ -52,9 +52,30 @@ If the index exceeds ~80 keys, friction only sees `pattern`, `noise`, and `dedup
 
 ## Reports
 
-A report is `.rusubon/inbox/reports/<slug>.md`. It names a path, a step vs that path’s baseline, ≥5 persons, 2–3 recording ids, `actionability=requires_human_input`.
+A report is `.rusubon/inbox/reports/<slug>.md`. Shape: `templates/report.md`. The file is the issue. Nothing opens Linear or GitHub.
+
+Required lines (plain text, not YAML):
+
+| Field | Rule |
+| --- | --- |
+| `#` title | One quantified line |
+| `priority` | `P1` / `P2` / `P3` only |
+| `priority_explanation` | One sentence that cites a number |
+| `actionability` | `requires_human_input` |
+
+Body must name the path, the step vs that path’s baseline, ≥5 persons, 2–3 recording ids.
+
+| Priority | When (friction) |
+| --- | --- |
+| P1 | Capture cliff: ratio dropped vs its 14d norm, traffic held, no matching Team config edit. Recordings are not retroactive. |
+| P2 | Corroborated money-path cluster on a `context.md` URL. |
+| P3 | Vision watch-gap (`obs` collapsed, recordings still flow). Do not create a scanner. |
+
+Do not file P0 or P4. If it feels P4, skip. If it feels P0, it is still a P1 cliff.
 
 Do not file if the shape is in `context.md` intentional friction, or a `noise:` / `dedupe:` memory key already covers it.
+
+`rusubon inbox` prints `P2  slug  title`, P1 first.
 
 ## Official PostHog MCP
 
@@ -69,7 +90,7 @@ If those tools are not available in the runner session, write a close-out that s
 | Command | Who | Effect |
 | --- | --- | --- |
 | `rusubon init` | you | scaffold + gitignore inbox/runs |
-| `rusubon doctor` | you | preflight (context, projectId, runner, MCP) |
+| `rusubon doctor` | you | preflight (context, projectId, host us\|eu, runner, MCP) |
 | `rusubon run friction` | you | manual scout; harness prints the summary, then inbox |
 | `rusubon inbox` | you | list open reports |
 | `rusubon show <slug>` | you | print a report (open or archived) |

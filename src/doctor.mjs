@@ -1,9 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { PLACEHOLDER_HOST, PLACEHOLDER_PROJECT, resolveHost } from "./config.mjs";
 import { PLACEHOLDER, loadContext } from "./context.mjs";
 import { RUNNERS } from "./runners.mjs";
-
-const PLACEHOLDER_PROJECT = "YOUR_PROJECT_ID";
 
 function which(bin) {
   const r = spawnSync("which", [bin], { encoding: "utf8" });
@@ -68,6 +67,26 @@ function checkProject(config) {
     };
   }
   return { name: "project", ok: true, detail: id };
+}
+
+function checkHost(config) {
+  const raw = config?.posthog?.host;
+  if (!raw || raw === PLACEHOLDER_HOST) {
+    return {
+      name: "host",
+      ok: false,
+      detail: "set posthog.host to us or eu (https://us.posthog.com / https://eu.posthog.com)",
+    };
+  }
+  const host = resolveHost(raw);
+  if (!host) {
+    return {
+      name: "host",
+      ok: false,
+      detail: `posthog.host must be us or eu (got ${raw})`,
+    };
+  }
+  return { name: "host", ok: true, detail: host };
 }
 
 function checkContext() {
@@ -158,7 +177,7 @@ function checkMcp(config, probes) {
 }
 
 export function collectChecks(config, probes = defaultProbes()) {
-  const local = [checkConfig(config), checkProject(config), checkContext()];
+  const local = [checkConfig(config), checkProject(config), checkHost(config), checkContext()];
   if (local.some((c) => !c.ok)) return local;
   return [
     ...local,

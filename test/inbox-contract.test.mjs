@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { afterEach, test } from "node:test";
 import { takeOption } from "../src/argv.mjs";
 import { main } from "../src/cli.mjs";
-import { initConfig, loadConfig } from "../src/config.mjs";
+import { POSTHOG_CLOUD, initConfig, loadConfig, resolveHost } from "../src/config.mjs";
 import { PLACEHOLDER, assertContextReady } from "../src/context.mjs";
 import { decline } from "../src/decline.mjs";
 import { assertReady, collectChecks, formatDoctor, posthogMcpOk } from "../src/doctor.mjs";
-import { listInbox, showReport } from "../src/inbox.mjs";
+import { formatInboxLine, listInbox, parseReport, showReport } from "../src/inbox.mjs";
 import { formatIndex, parseKey, remember } from "../src/memory.mjs";
 import { buildPrompt, loadSkill } from "../src/run.mjs";
 import { formatDuration, formatRunSummary, snapshotState, summarizeRun } from "../src/summary.mjs";
@@ -79,6 +79,15 @@ test("init scaffolds .rusubon and never writes .mcp.json", () => {
   assert.match(gi, /\.rusubon\/inbox\//);
   assert.match(gi, /\.rusubon\/runs\//);
   assert.equal(loadConfig().runner, "claude");
+  assert.equal(loadConfig().posthog.host, "YOUR_REGION");
+});
+
+test("resolveHost accepts us or eu, nothing else", () => {
+  assert.equal(resolveHost("us"), POSTHOG_CLOUD.us);
+  assert.equal(resolveHost("EU"), POSTHOG_CLOUD.eu);
+  assert.equal(resolveHost("https://eu.posthog.com/"), POSTHOG_CLOUD.eu);
+  assert.equal(resolveHost("YOUR_REGION"), "");
+  assert.equal(resolveHost("https://app.posthog.com"), "");
 });
 
 test("run refuses placeholder context", async () => {
@@ -136,8 +145,37 @@ test("buildPrompt injects context and memory index", () => {
   assert.match(prompt, /noise\/paywall-eu — intentional EU checkout gate/);
   assert.match(prompt, /no PostHog tools/);
   assert.match(prompt, /\.rusubon\/inbox\/reports/);
+  assert.match(prompt, /priority: P1\|P2\|P3/);
+  assert.match(prompt, /templates\/report\.md/);
   assert.doesNotMatch(prompt, /scratchpad\.md/);
   assert.doesNotMatch(prompt, /inbox\/findings/);
+});
+
+test("inbox lists P1 before P3 as priority slug title", () => {
+  tmp();
+  initConfig();
+  mkdirSync(".rusubon/inbox/reports", { recursive: true });
+  writeFileSync(
+    ".rusubon/inbox/reports/vision-gap.md",
+    "# Vision obs collapsed\n\npriority: P3\npriority_explanation: obs_7d is 0 while 400 recordings flowed.\nactionability: requires_human_input\n",
+  );
+  writeFileSync(
+    ".rusubon/inbox/reports/capture-cliff.md",
+    "# Capture ratio 12% of 14d norm\n\npriority: P1\npriority_explanation: Capture fell to 12% of the 14d norm, traffic held.\nactionability: requires_human_input\n",
+  );
+  writeFileSync(".rusubon/inbox/reports/old-note.md", "# No priority yet\n\nlegacy\n");
+  const items = listInbox();
+  assert.deepEqual(
+    items.map((i) => formatInboxLine(i)),
+    [
+      "P1  capture-cliff  Capture ratio 12% of 14d norm",
+      "P3  vision-gap  Vision obs collapsed",
+      "—  old-note  No priority yet",
+    ],
+  );
+  const parsed = parseReport(items[0].path ? readFileSync(items[0].path, "utf8") : "", "");
+  assert.equal(parsed.priority, "P1");
+  assert.match(parsed.priorityExplanation, /12%/);
 });
 
 test("cli remember and decline --why", async () => {
@@ -160,6 +198,26 @@ test("doctor fails local checks before probing the runner", () => {
   assert.equal(checks.some((c) => c.name === "mcp"), false);
   assert.match(formatDoctor(checks), /fail\s+context/);
   assert.match(formatDoctor(checks), /fail\s+project/);
+  assert.match(formatDoctor(checks), /fail\s+host/);
+});
+
+test("doctor fails a host that is not us or eu", () => {
+  tmp();
+  initConfig();
+  fillContext();
+  writeFileSync(
+    "rusubon.json",
+    JSON.stringify({ posthog: { projectId: "123", host: "https://app.posthog.com" }, runner: "claude" }, null, 2) +
+      "\n",
+  );
+  const checks = collectChecks(loadConfig(), okProbes);
+  assert.match(formatDoctor(checks), /fail\s+host/);
+  writeFileSync(
+    "rusubon.json",
+    JSON.stringify({ posthog: { projectId: "123", host: "eu" }, runner: "claude" }, null, 2) + "\n",
+  );
+  assert.equal(loadConfig().posthog.host, POSTHOG_CLOUD.eu);
+  assert.doesNotThrow(() => assertReady(loadConfig(), okProbes));
 });
 
 test("doctor and assertReady accept a ready tree with stub probes", () => {
@@ -226,7 +284,7 @@ test("harness summary diffs reports, memory, and close-out", () => {
   const text = formatRunSummary(summary);
   assert.match(text, /friction  2m13s  mcp=ok/);
   assert.match(text, /reports   1/);
-  assert.match(text, /paywall-eu \(new\)/);
+  assert.match(text, /—  paywall-eu \(new\)/);
   assert.match(text, /pattern\/frustration-mean-is-mix \(new\)/);
   assert.match(text, /pattern\/capture-baseline \(updated\)/);
 });

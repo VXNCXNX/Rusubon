@@ -13,11 +13,27 @@ import {
 
 export { cwd };
 export const CONFIG_NAME = "rusubon.json";
+export const PLACEHOLDER_PROJECT = "YOUR_PROJECT_ID";
+export const PLACEHOLDER_HOST = "YOUR_REGION";
+export const POSTHOG_CLOUD = {
+  us: "https://us.posthog.com",
+  eu: "https://eu.posthog.com",
+};
 
 const DEFAULT_CONFIG = {
-  posthog: { projectId: "YOUR_PROJECT_ID", host: "https://us.posthog.com" },
+  posthog: { projectId: PLACEHOLDER_PROJECT, host: PLACEHOLDER_HOST },
   runner: "claude",
 };
+
+export function resolveHost(raw) {
+  const s = String(raw || "")
+    .trim()
+    .replace(/\/$/, "")
+    .toLowerCase();
+  if (s === "us" || s === POSTHOG_CLOUD.us) return POSTHOG_CLOUD.us;
+  if (s === "eu" || s === POSTHOG_CLOUD.eu) return POSTHOG_CLOUD.eu;
+  return "";
+}
 
 const GITIGNORE_LINES = [".rusubon/inbox/", ".rusubon/runs/"];
 
@@ -31,8 +47,13 @@ export function loadConfig() {
     throw new Error(`no ${CONFIG_NAME} here. run \`rusubon init\` first.`);
   }
   const raw = JSON.parse(readFileSync(path, "utf8"));
+  const projectId = raw.posthog?.projectId || DEFAULT_CONFIG.posthog.projectId;
+  const hostRaw = raw.posthog?.host ?? DEFAULT_CONFIG.posthog.host;
   return {
-    posthog: { ...DEFAULT_CONFIG.posthog, ...raw.posthog },
+    posthog: {
+      projectId,
+      host: resolveHost(hostRaw) || hostRaw,
+    },
     runner: raw.runner || DEFAULT_CONFIG.runner,
   };
 }

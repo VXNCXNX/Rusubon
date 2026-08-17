@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parseReport } from "./inbox.mjs";
 import { cwd, memoryDir, reportsDir, runsDir } from "./paths.mjs";
 
 const SKIP = new Set(["last-prompt.md"]);
@@ -98,7 +99,9 @@ export function formatRunSummary(summary) {
     `reports   ${summary.reports.length}`,
   ];
   for (const r of summary.reports) {
-    lines.push(`          ${r.key} (${r.kind})`);
+    const path = join(reportsDir(), `${r.key}.md`);
+    const pri = existsSync(path) ? parseReport(readFileSync(path, "utf8"), r.key).priority : "";
+    lines.push(`          ${pri || "—"}  ${r.key} (${r.kind})`);
   }
   lines.push(`memory    ${mem}`);
   if (summary.closeOut) {
