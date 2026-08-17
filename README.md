@@ -2,22 +2,13 @@
 
 **留守番.** The one who watches the house while you're out.
 
-PostHog scouts on the Claude / Cursor / Codex login you already pay for.
-Findings are markdown files in your product repo.
-You type the command. You `decline --why`. Nothing opens a PR or a GitHub issue.
+PostHog already recorded the sessions. You already pay for Claude, Cursor, or Codex.
+Rusubon runs a scout on that login, through official PostHog MCP, and writes friction findings as markdown in your product repo.
 
-17 Aug 2026, one real run: 2m13s, 622 recordings in 7 days, 0 reports.
-The "frustration" step was mix. The `purchasing` tag was people hitting checkout success.
-
-```
-posthog events  →  rusubon run friction  →  .rusubon/inbox/reports/  →  you review / decline
-                       ↑ your Claude / Cursor / Codex  (official PostHog MCP)
-```
-
-Not PostHog Inbox. Not Replay Vision.
+A finding is a file: a path, a step that broke vs that path's baseline, enough people that it isn't one angry session. You `show` it. You `decline --why` when it's noise or a gate you meant to have. Next run can skip it. Nothing opens a PR or a GitHub issue.
 
 `rusubon init` in the **product** repo (not this package). Then `rusubon run friction`.
-`doctor` refuses if the runner isn't logged in. It caught an expired Claude Max session before we burned another run.
+`doctor` refuses if `.rusubon/context.md` is still a placeholder, the runner isn't logged in, or PostHog MCP is missing.
 
 Contract: [docs/inbox-contract.md](docs/inbox-contract.md).
 
