@@ -54,10 +54,10 @@ export function buildPrompt(skill, config, extras = {}) {
   const phaseBlock =
     phase === 2
       ? `- **PHASE 2 (read).** Candidates are below. Read \`.rusubon/memory/${SESSION_CURSOR_KEY}.md\` if it exists. Skip an id unless it has a cheaper-signal newer than lastRead. Take at most ${READ_MAX_SESSIONS} ids, worst-first. Budget ${Math.round(READ_MAX_MS / 60000)} minutes.
-- Spawn sub-agents in parallel (~${READ_BATCH} ids each). Each sub-agent reads events + console + \`session-recording-get\` / \`query-session-recordings-list\` if those tools exist. They return notes. They do **not** write inbox, candidates, or close-out.
-- You (parent) cluster and write 0–3 reports. P2 still needs ≥5 persons / ≥10 sessions. Update the cursor. Rewrite the close-out.
+- Spawn sub-agents in parallel (~${READ_BATCH} ids each). Each sub-agent reads events + console + \`posthog.session_replay_features\` + \`session-recording-get\` / \`query-session-recordings-list\` if those exist. Stored summaries if present (\`session-recording-summaries-list\` / \`session-recording-summary-get\`). Never generate summaries. Heatmaps if present; skip if absent. They return notes. They do **not** write inbox, candidates, or close-out.
+- You (parent) cluster and write 0–3 reports. P2 still needs ≥5 persons / ≥10 sessions. Paste a Series table and the HogQL behind it. Update the cursor. Rewrite the close-out.
 - Do not file a money-path cluster that you did not read.`
-      : `- **PHASE 1 (SQL).** Capture, Vision roster, qualify sessions. Write \`${candRel}\` even if \`ids\` is \`[]\`.
+      : `- **PHASE 1 (SQL).** Capture, Vision roster, rage concentration (14d vs 24h), broken-experience cohort if the features table exists, qualify sessions. Write \`${candRel}\` even if \`ids\` is \`[]\`.
 - You may file P1 capture cliff, P3 Vision watch-gap, or \`not-in-use\`. Do **not** file a money-path cluster. That is phase 2.
 - Cursor: \`.rusubon/memory/${SESSION_CURSOR_KEY}.md\`. Drop ids already read unless lastSignalAt is newer than lastRead.`;
 
@@ -81,10 +81,10 @@ ${index}
 - PostHog host: ${config.posthog.host}
 - Working directory: ${cwd()}
 - Skill directory (Read if needed): ${skillRoot}
-- Official PostHog MCP only (\`execute-sql\` / HogQL, or CLI-mode \`exec\` → \`call execute-sql\`). Replay metadata tools if present: \`query-session-recordings-list\`, \`session-recording-get\`. No HTTP API, no Composio, no \`phc_\` tokens. No video. No new Vision scanners.
+- Official PostHog MCP only (\`execute-sql\` / HogQL, or CLI-mode \`exec\` → \`call execute-sql\`). Replay metadata if present: \`query-session-recordings-list\`, \`session-recording-get\`, stored summaries (read only), heatmaps. No HTTP API, no Composio, no \`phc_\` tokens. No video. No new Vision scanners. Never generate session summaries.
 - If those PostHog SQL tools are not available in this session: write the close-out so it **starts with** \`no PostHog tools\` and emit **nothing** (no report, no candidates).
 - Open reports: \`.rusubon/inbox/reports/<slug>.md\`
-- Report shape: copy \`${resolve(pkgRoot(), "templates", "report.md")}\`. Required lines: \`# title\`, \`priority: P1|P2|P3\`, \`priority_explanation\` (one sentence with a number), \`actionability: requires_human_input\`.
+- Report shape: copy \`${resolve(pkgRoot(), "templates", "report.md")}\`. Required lines: \`# title\` (one quantified line, technical English), \`priority: P1|P2|P3\`, \`priority_explanation\` (one sentence with a number), \`actionability: requires_human_input\`. Include a Series markdown table of numbers you already queried, and a Query section with that HogQL. The hook must read without the table.
 - Candidates file: \`${candRel}\`
 - This run's close-out: ${runFile}
 ${phaseBlock}

@@ -11,6 +11,9 @@ Expat license in the PostHog/posthog repository, including:
   products/signals/skills/signals-scout-session-replay/SKILL.md
   products/signals/skills/signals-scout-replay-vision/SKILL.md
   products/signals/skills/authoring-scouts/references/*
+  products/desktop/packages/ui/src/features/canvas/contextPrompt.ts
+    (discovery/seed/untrusted-source shape only; we do not copy
+    their unattended MCP publish)
 
 The original MIT notice is in LICENSE-PostHog-MIT.
 

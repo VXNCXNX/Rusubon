@@ -1,3 +1,13 @@
+export function takeFlag(argv, name) {
+  const rest = [];
+  let present = false;
+  for (const a of argv) {
+    if (a === `--${name}`) present = true;
+    else rest.push(a);
+  }
+  return { rest, present };
+}
+
 export function takeOption(argv, name) {
   const rest = [];
   let value;

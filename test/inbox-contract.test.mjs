@@ -3,13 +3,21 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, test } from "node:test";
-import { takeOption } from "../src/argv.mjs";
+import { takeFlag, takeOption } from "../src/argv.mjs";
+import {
+  DRAFT_PLACEHOLDER_LINE,
+  assertDraftAllowed,
+  buildDraftPrompt,
+  missingSections,
+  posthogDraftReady,
+  sealDraft,
+} from "../src/context-draft.mjs";
 import { main } from "../src/cli.mjs";
 import {
   parseCandidates,
   shouldRunPhase2,
 } from "../src/candidates.mjs";
-import { POSTHOG_CLOUD, initConfig, loadConfig, resolveHost } from "../src/config.mjs";
+import { POSTHOG_CLOUD, initConfig, loadConfig, pkgRoot, resolveHost } from "../src/config.mjs";
 import { PLACEHOLDER, assertContextReady } from "../src/context.mjs";
 import { decline } from "../src/decline.mjs";
 import { assertReady, collectChecks, formatDoctor, posthogMcpOk } from "../src/doctor.mjs";
@@ -155,8 +163,22 @@ test("buildPrompt injects context and memory index", () => {
   assert.match(prompt, /templates\/report\.md/);
   assert.match(prompt, /PHASE 1/);
   assert.match(prompt, /friction-candidates\.json/);
+  assert.match(prompt, /session_replay_features/);
+  assert.match(prompt, /rageclicks_24h/);
+  assert.match(prompt, /argMinMerge/);
+  assert.match(prompt, /session-recording-summaries-list/);
+  assert.match(prompt, /Series markdown table/);
+  assert.match(prompt, /Query section with that HogQL/);
   assert.doesNotMatch(prompt, /scratchpad\.md/);
   assert.doesNotMatch(prompt, /inbox\/findings/);
+});
+
+test("report template has a Series table", () => {
+  const text = readFileSync(join(pkgRoot(), "templates", "report.md"), "utf8");
+  assert.match(text, /^## Series$/m);
+  assert.match(text, /numerator/);
+  assert.match(text, /^## Query$/m);
+  assert.match(text, /```sql/);
 });
 
 test("phase 2 prompt gets candidates; shouldRunPhase2 is Claude-only", () => {
@@ -179,6 +201,8 @@ test("phase 2 prompt gets candidates; shouldRunPhase2 is Claude-only", () => {
   const p2 = buildPrompt(loadSkill("friction"), cfg, { phase: 2, candidates });
   assert.match(p2, /PHASE 2/);
   assert.match(p2, /sub-agents/);
+  assert.match(p2, /session_replay_features/);
+  assert.match(p2, /session-recording-summaries-list/);
   assert.match(p2, /"sessionId": "bbb"/);
   assert.equal(shouldRunPhase2(cfg, candidates, "# ok\n"), true);
   assert.equal(shouldRunPhase2({ ...cfg, runner: "cursor" }, candidates, "# ok\n"), false);
@@ -344,4 +368,49 @@ test("takeOption parses --why", () => {
     rest: ["paywall-eu"],
     value: "because",
   });
+  assert.deepEqual(takeFlag(["draft", "--force", "x"], "force"), {
+    rest: ["draft", "x"],
+    present: true,
+  });
+});
+
+test("context draft prompt is fail-closed and scout-shaped", () => {
+  const empty = {
+    posthog: { projectId: "YOUR_PROJECT_ID", host: "YOUR_REGION" },
+    runner: "claude",
+  };
+  const bare = buildDraftPrompt(empty, "");
+  assert.match(bare, /RUSUBON_CONTEXT_PLACEHOLDER/);
+  assert.match(bare, /# Money paths/);
+  assert.match(bare, /untrusted/);
+  assert.doesNotMatch(bare, /channel-instructions-update/);
+  assert.doesNotMatch(bare, /Conventions & gotchas/);
+  assert.doesNotMatch(bare, /Related PostHog resources/);
+  assert.equal(posthogDraftReady(empty), false);
+
+  const ready = {
+    posthog: { projectId: "123", host: "https://us.posthog.com" },
+    runner: "claude",
+  };
+  const seeded = buildDraftPrompt(ready, "Feature flags help teams roll out.");
+  assert.match(seeded, /Feature flags help teams roll out/);
+  assert.match(seeded, /\$pageview/);
+  assert.match(seeded, /project_id 123/);
+  assert.equal(posthogDraftReady(ready), true);
+});
+
+test("sealDraft always restores the placeholder", () => {
+  const sealed = sealDraft("# Product\nA demo.\n\n# Money paths\n- /checkout\n");
+  assert.ok(sealed.startsWith(DRAFT_PLACEHOLDER_LINE));
+  assert.match(sealed, /# Product/);
+  assert.deepEqual(missingSections(sealed), ["# Intentional friction", "# Out of scope"]);
+  const twice = sealDraft(`${DRAFT_PLACEHOLDER_LINE}\n\n# Product\n`);
+  assert.equal(twice.indexOf(PLACEHOLDER), twice.lastIndexOf(PLACEHOLDER));
+});
+
+test("assertDraftAllowed refuses a filled context without --force", () => {
+  assert.doesNotThrow(() => assertDraftAllowed("", false));
+  assert.doesNotThrow(() => assertDraftAllowed(`${PLACEHOLDER}\n# Product\n`, false));
+  assert.throws(() => assertDraftAllowed("# Product\nfilled\n", false), /already filled/);
+  assert.doesNotThrow(() => assertDraftAllowed("# Product\nfilled\n", true));
 });

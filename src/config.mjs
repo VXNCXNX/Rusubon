@@ -96,7 +96,7 @@ export function initConfig() {
     copyFileSync(bundled, mcpExample);
     console.log("wrote rusubon.mcp.example.json (not .mcp.json)");
   }
-  console.log("ready. fill .rusubon/context.md and rusubon.json, then `rusubon run friction`.");
+  console.log("ready. fill .rusubon/context.md (or `rusubon context draft`) and rusubon.json, then `rusubon run friction`.");
 }
 
 function ensureGitignore() {

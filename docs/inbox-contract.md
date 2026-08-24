@@ -28,6 +28,8 @@ Required sections:
 3. Intentional friction — paywall, region, loading, checkout: do **not** file as bugs
 4. Out of scope (staging, internal)
 
+`rusubon context draft` can propose a first pass (repo + optional PostHog `$pageview` paths), analog of PostHog Desktop's "Build with agent". The harness **re-seals** the placeholder after the runner writes. `run` / `doctor` stay closed until a human edits money paths and intentional friction and deletes the comment. `--force` overwrites a filled file and puts the placeholder back. This is not Desktop `CONTEXT.md` (conventions, key files, reviewers).
+
 `rusubon run` refuses while the placeholder marker `RUSUBON_CONTEXT_PLACEHOLDER` is still in the file, or if `rusubon doctor` fails (projectId or host still a placeholder, host not `us`/`eu`, runner missing / not logged in, no official PostHog MCP on the runner). No HTTP call to PostHog — doctor only inspects local files and the runner CLI.
 
 ## Memory
@@ -58,17 +60,25 @@ Required lines (plain text, not YAML):
 
 | Field | Rule |
 | --- | --- |
-| `#` title | One quantified line |
+| `#` title | One quantified line, technical English. No poetry. |
 | `priority` | `P1` / `P2` / `P3` only |
 | `priority_explanation` | One sentence that cites a number |
 | `actionability` | `requires_human_input` |
 
-Body must name the path, the step vs that path’s baseline, ≥5 persons, 2–3 recording ids.
+Body must name the path (and element if known), the step vs that path’s baseline, ≥5 persons, 2–3 recording ids.
+
+**Series.** Paste a markdown table of numbers you already queried. Recordings vs site traffic for a capture cliff. The surface’s friction-rate series for a cluster. Pin calendar dates. The hook must stand if the table is dropped. This is the file equivalent of PostHog’s report `charts` field. We do not attach Insight nodes.
+
+**Query.** Paste the HogQL that produced that table. A number a human cannot re-run is a number they cannot trust. File analog of Canvas “view query”. Do not invent event names. Confirm they exist (`read-data-schema`) before aggregating.
+
+A URL with no history cannot have a step-change. First sighting of a hot new page is a `pattern/` note, not a report, unless the friction is extreme and corroborated after a session read.
+
+A still-live report on the same surface is an edit (append the fresh window), not a second file. Write `memory/report/<slug>` after filing so the next run finds it.
 
 | Priority | When (friction) |
 | --- | --- |
 | P1 | Capture cliff: ratio dropped vs its 14d norm, traffic held, no matching Team config edit. Recordings are not retroactive. |
-| P2 | Corroborated money-path cluster on a `context.md` URL. |
+| P2 | Corroborated money-path cluster or broken-experience cohort on a `context.md` URL, after a session read. |
 | P3 | Vision watch-gap (`obs` collapsed, recordings still flow). Do not create a scanner. |
 
 Do not file P0 or P4. If it feels P4, skip. If it feels P0, it is still a P1 cliff.
@@ -83,10 +93,14 @@ Do not file if the shape is in `context.md` intentional friction, or a `noise:` 
 
 On **Claude**, the harness runs the skill twice:
 
-1. **Phase 1 (SQL)** — capture cliff (P1), Vision watch-gap (P3), `not-in-use`. Writes `.rusubon/runs/YYYY-MM-DD-friction-candidates.json`. Does **not** file a money-path cluster.
+1. **Phase 1 (SQL)** — capture cliff (P1), Vision watch-gap (P3), `not-in-use`. Also runs rage concentration (14d vs 24h) and the broken-experience cohort if `posthog.session_replay_features` exists. Writes `.rusubon/runs/YYYY-MM-DD-friction-candidates.json`. Does **not** file a money-path cluster.
 2. **Phase 2 (read)** — only if that file has ids. Second Claude process (`read.effort` default `low`, optional `read.model` in `rusubon.json`). Parent spawns sub-agents (~10 ids each). Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor: `.rusubon/memory/dedupe/friction-session-cursor.md`. Skip an id until a newer cheap signal.
 
-Qualified id: money path from `context.md` in the last 7 days, plus `$rageclick` / `$dead_click` / `$exception` / `$recording_observed`. Sort by signal count. Read events + console + replay **metadata** MCP tools if present. No video. No new Vision scanner.
+Qualified id: money path from `context.md` in the last 7 days, plus `$rageclick` / `$dead_click` / `$exception` / `$recording_observed`, or a broken-experience row on a money path. Prefer paths whose 24h rage is ≥ ~3× the prior-13-day daily mean. Sort by signal count. Read events + console + `session_replay_features` + replay **metadata** MCP tools if present. Read stored session summaries if present. Never generate summaries. Heatmaps if present; skip if absent. No video. No new Vision scanner.
+
+`$rageclick` fires whether or not the session was recorded. Quantify on events. Corroborate with recordings.
+
+Zero `$recording_observed` in 30d is not `not-in-use` by itself. Failures never write that event. Check `vision-scanners-list` when the tool exists.
 
 **Cursor / Codex:** phase 1 only. Candidates stay unread.
 
@@ -105,6 +119,7 @@ If those tools are not available in the runner session, write a close-out that s
 | Command | Who | Effect |
 | --- | --- | --- |
 | `rusubon init` | you | scaffold + gitignore inbox/runs |
+| `rusubon context draft` | you | propose `context.md` (placeholder stays) |
 | `rusubon doctor` | you | preflight (context, projectId, host us\|eu, runner, MCP) |
 | `rusubon run friction` | you | two-phase scout on Claude (SQL then session read); then inbox |
 | `rusubon inbox` | you | list open reports |

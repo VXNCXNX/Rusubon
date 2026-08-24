@@ -1,5 +1,6 @@
-import { takeOption, readStdin } from "./argv.mjs";
+import { takeFlag, takeOption, readStdin } from "./argv.mjs";
 import { initConfig, loadConfig, CONFIG_NAME } from "./config.mjs";
+import { draftContext } from "./context-draft.mjs";
 import { decline } from "./decline.mjs";
 import { collectChecks, formatDoctor } from "./doctor.mjs";
 import { listInbox, printInbox, printShow, showReport } from "./inbox.mjs";
@@ -11,6 +12,8 @@ const HELP = `Rusubon — 留守番 — product scouts for PostHog, on your own 
 
 Usage:
   rusubon init                         scaffold .rusubon/ + ${CONFIG_NAME}
+  rusubon context draft [--about "…"] [--force]
+                                       propose context.md (placeholder stays)
   rusubon doctor                       preflight before a run
   rusubon run <skill>                  run a scout (friction)
   rusubon inbox                        list open reports
@@ -41,6 +44,16 @@ export async function main(argv) {
   switch (cmd) {
     case "init":
       return initConfig();
+    case "context": {
+      if (rest[0] !== "draft") {
+        throw new Error('usage: rusubon context draft [--about "…"] [--force]');
+      }
+      const force = takeFlag(rest.slice(1), "force");
+      const aboutOpt = takeOption(force.rest, "about");
+      let about = (aboutOpt.value || aboutOpt.rest.join(" ")).trim();
+      if (!about) about = (await readStdin()).trim();
+      return draftContext({ about, force: force.present });
+    }
     case "doctor":
       return doctorCommand();
     case "run": {

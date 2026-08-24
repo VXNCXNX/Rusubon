@@ -28,7 +28,13 @@ rusubon init
 
 That writes `rusubon.json`, `.rusubon/context.md` (you fill this), `.rusubon/memory/`, and gitignores `.rusubon/inbox/` + `.rusubon/runs/`. It does not write `.mcp.json`.
 
-Fill `.rusubon/context.md` (product, money paths, intentional friction, out of scope) and set `posthog.projectId` in `rusubon.json`. `rusubon doctor` checks those, plus runner login and official PostHog MCP.
+Fill `.rusubon/context.md` (product, money paths, intentional friction, out of scope) and set `posthog.projectId` in `rusubon.json`. Or propose a first pass:
+
+```bash
+rusubon context draft --about "…"
+```
+
+That writes guesses (marked as guessed) and **keeps** the placeholder. Edit the money paths. Delete the comment. `rusubon doctor` still refuses until you do. `rusubon doctor` also checks runner login and official PostHog MCP.
 
 Log into the runner (`claude` by default). Point it at the official PostHog MCP: copy `rusubon.mcp.example.json` into Claude/Cursor MCP config, or:
 
@@ -47,7 +53,7 @@ rusubon decline <slug> --why "intentional EU checkout gate"
 rusubon remember pattern/capture-baseline still quiet week of …
 ```
 
-`run` on Claude is two passes: SQL first (capture / Vision), then a low-effort read of sessions that hit a money path *and* a cheap signal (rage, dead click, exception, Vision tag). Sub-agents scan those ids in parallel. The parent writes 0–3 reports. Cap 100 sessions or 45 minutes. Cursor and Codex stop after SQL.
+`run` on Claude is two passes: SQL first (capture, Vision, rage concentration), then a low-effort read of sessions that hit a money path *and* a cheap signal (rage, dead click, exception, Vision tag). Sub-agents scan those ids in parallel. The parent writes 0–3 reports. A report is a quantified title, a step vs that path's baseline, and a Series table of numbers already queried. Cap 100 sessions or 45 minutes. Cursor and Codex stop after SQL.
 
 `run` ends with a harness block (duration, `mcp=ok|missing`, reports, memory writes, close-out) and the inbox. Read a finding with `show`. Archive it with `decline --why`.
 
