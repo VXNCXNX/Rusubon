@@ -141,6 +141,67 @@ test("stray and duplicate Files declarations cannot authorize changes", async ()
   }
 });
 
+test("ignored task declarations fail before implementation", async () => {
+  const f = setup();
+  writeFileSync(join(f.repo, ".git/info/exclude"), "local-helper.mjs\n");
+  await assert.rejects(f.start(async (...args) => {
+    await f.run(...args);
+    if (f.calls.length === 1) {
+      const path = join(f.latest.specDir, "tasks.md");
+      writeFileSync(path, readFileSync(path, "utf8").replace("Files:", "Files: `local-helper.mjs`,"));
+    } else writeFileSync(join(f.repo, "local-helper.mjs"), "export const value = true;\n");
+    return { status: 0 };
+  }), /ignored task files/);
+  assert.deepEqual(f.calls, ["research"]);
+  assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+});
+
+test("implementation cannot make declared files invisible before verification", async () => {
+  for (const ignoreFile of [".gitignore", ".git/info/exclude"]) {
+    const f = setup();
+    await assert.rejects(f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 1) {
+        const path = join(f.latest.specDir, "tasks.md");
+        writeFileSync(path, readFileSync(path, "utf8").replace("Files:", "Files: `.gitignore`, `local-helper.mjs`,"));
+      } else {
+        const path = join(f.repo, ignoreFile);
+        writeFileSync(path, readFileSync(path, "utf8") + "\nlocal-helper.mjs\n");
+        writeFileSync(join(f.repo, "local-helper.mjs"), "export const value = true;\n");
+      }
+      return { status: 0 };
+    }), /ignored task files/);
+    assert.deepEqual(f.calls, ["research", "implementation"]);
+    assert.ok(!existsSync(join(dirname(f.latest.resultPath), "verification.json")));
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
+test("tracked task files remain publishable when ignore rules match them", async () => {
+  const f = setup();
+  writeFileSync(join(f.repo, ".git/info/exclude"), "retry.mjs\n");
+  assert.ok((await f.start()).url);
+});
+
+test("versionless TAP from an executed verification command can publish", async () => {
+  const f = setup();
+  const result = await f.start(async (...args) => {
+    await f.run(...args);
+    if (f.calls.length === 1) {
+      const path = join(f.latest.specDir, ".spec-state.json");
+      const state = JSON.parse(readFileSync(path));
+      state.verification[0].argv = [process.execPath, "--input-type=module", "-e",
+        "import assert from 'node:assert/strict'; import {canRetry} from './retry.mjs'; "
+        + "assert.equal(canRetry(false,true),true); console.log('ok 1 - retry works\\n1..1');"];
+      writeFileSync(path, JSON.stringify(state));
+    }
+    return { status: 0 };
+  });
+  assert.ok(result.url);
+  const receipt = JSON.parse(readFileSync(join(dirname(result.closeOut), "verification.json")));
+  assert.equal(receipt.commands[0].passed, 1);
+});
+
 test("hidden worktree edits fail before research without changing index flags", async () => {
   for (const flag of ["--assume-unchanged", "--skip-worktree"]) {
     const f = setup();

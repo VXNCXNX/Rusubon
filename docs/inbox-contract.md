@@ -148,13 +148,18 @@ Old close-outs and results from other sources or runs cannot complete this run.
    Each checkbox task has one nonempty Files: declaration. Stray declarations
    and duplicate Files: lines fail validation. Validation and execution share
    the same task parser.
+   Declared files must be visible to Git and outside the harness run directory.
+   Ignore rules are checked before implementation and again during verification;
+   already-tracked files remain eligible when an ignore rule matches them.
 3. A new runner phase implements on a unique `codex/rusubon-*` branch. It may
    change declared task files, checkboxes and closure, but not the validated plan.
    Its result also supplies pr_title and pr_body, including Agent context.
 4. The harness runs every command from the spec's verification array. Commands
    use executable argv and a repo-relative cwd. Test commands emit TAP with at
    least one named passing case and valid test plans at every nesting level;
-   checks use exit status. Invalid TAP, failures, zero-case plans,
+   the TAP version header is optional. Nested wrappers count only their passing
+   leaf cases, and skipped or TODO subtrees contribute no passing cases.
+   Other checks use exit status. Invalid TAP, failures, zero-case plans,
    skipped-only suites, timeouts and code changes during verification stop the run.
 5. A harness receipt binds command results and logs to the run, source, spec
    and non-ignored code contents. The harness checks it before committing,

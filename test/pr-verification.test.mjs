@@ -43,3 +43,34 @@ test("test names are labels even when they match repository paths", () => {
       + `    ok 1 - ${name}\n    1..1\nok 1 - parent\n1..1\n`), 1);
   }
 });
+
+test("valid TAP may omit its version header", () => {
+  for (const tap of [
+    "ok 1 - case\n1..1\n",
+    "1..1\nok 1 - case\n",
+    "# runner comment\nok 1 - case\n1..1\n",
+    "# Subtest: suite\n    ok 1 - case\n    1..1\nok 1 - suite\n1..1\n",
+    "    ok 1 - case\n    1..1\nok 1 - suite\n1..1\n",
+  ]) {
+    assert.equal(passingTap(tap), 1);
+    assert.equal(passingTap("> app@1 test\n> test-command\n\n" + tap), 1);
+  }
+});
+
+test("finding the TAP start never discards failures or malformed protocol", () => {
+  for (const tap of [
+    "not ok 1 - failed\nTAP version 13\nok 2 - passes\n1..2\n",
+    "Bail out! stopped\nTAP version 13\nok 1 - passes\n1..1\n",
+    "TAP version invalid\nok 1 - passes\n1..1\n",
+    "# Subtest: suite\n    not ok 1 - failed\n    1..1\nok 1 - suite\n1..1\n",
+    "ok 1 - only\n1..2\n",
+  ]) assert.throws(() => passingTap(tap), /did not produce passing TAP/);
+});
+
+test("nested wrappers and skipped subtrees do not inflate the passing count", () => {
+  assert.equal(passingTap("ok 1 - buffered {\n    ok 1 - leaf\n    1..1\n}\n1..1\n"), 1);
+  assert.equal(passingTap("# Subtest: skipped\n    ok 1 - leaf\n    1..1\n"
+    + "ok 1 - skipped # SKIP later\nok 2 - actual case\n1..2\n"), 1);
+  assert.throws(() => passingTap("# Subtest: skipped\n    ok 1 - leaf\n    1..1\n"
+    + "ok 1 - skipped # SKIP later\n1..1\n"), /no named test/);
+});

@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Parser } from "tap-parser";
 import { assertReceipt, hash, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
+import { parseTasks } from "../skills/spec/scripts/tasks.mjs";
 import { skillsDir } from "./run.mjs";
 import { redact } from "./doctor.mjs";
 
@@ -11,27 +12,49 @@ export function validateSpec(repo, specDir, receiptPath) {
   if (receiptPath) args.push("--complete", "--receipt", receiptPath);
   const result = spawnSync(process.execPath, args, { cwd: repo, encoding: "utf8", timeout: 30000 });
   if (result.status !== 0) throw new Error(`spec validation failed: ${result.stdout || ""}${result.stderr || result.error?.message || ""}`);
+  const { tasks } = parseTasks(readFileSync(join(specDir, "tasks.md"), "utf8"));
+  const paths = [...new Set(tasks.flatMap((task) => task.files.map((path) => relative(repo, localPath(repo, path)))))];
+  if (paths.some((path) => path === ".rusubon/runs" || path.startsWith(".rusubon/runs/"))) {
+    throw new Error("task files cannot use the harness run-artifact directory");
+  }
+  // Tracked files remain eligible even when an ignore rule also matches them.
+  // Recheck on every validation so implementation cannot introduce new exclusions.
+  const ignored = spawnSync("git", ["check-ignore", "--stdin", "-z"], {
+    cwd: repo, input: paths.join("\0") + "\0", encoding: "utf8", timeout: 30000,
+  });
+  if (ignored.status === 0) throw new Error(`ignored task files cannot be published: ${ignored.stdout.split("\0").filter(Boolean).join(", ")}`);
+  if (ignored.status !== 1) throw new Error(`cannot check task file visibility: ${ignored.stderr || ignored.error?.message || ignored.status}`);
 }
 
 export function passingTap(output) {
   // npm may print its script banner before the TAP stream starts.
-  const start = output.search(/^TAP version \d+\s*$/m);
+  // Version headers are optional. Preserve comments, nested tests and failures
+  // from the first protocol line instead of seeking a later successful header.
+  const start = output.search(/^[ \t]*(?:TAP version\b|(?:not )?ok\b|\d+\.\.|Bail out!|#|pragma\b)/im);
   const parser = new Parser({ strict: true });
-  let passed = 0;
   let extra = false;
-  parser.on("extra", () => { extra = true; });
-  parser.on("pass", (result) => {
-    // The parser excludes closing subtest points; suite metadata excludes empty suites.
-    // A test name can be any string, including an existing repository path.
-    if (result.name.trim() && result.diag?.type !== "suite") passed++;
-  });
+  function countCases(stream) {
+    const counts = { passed: 0 };
+    let child;
+    stream.on("extra", () => { extra = true; });
+    stream.on("child", (nested) => { child = countCases(nested); });
+    stream.on("assert", (result) => {
+      const nested = child; child = undefined;
+      if (!result.ok || result.skip || result.todo) return;
+      // A closing test point contributes its children, never an extra case.
+      // This also handles anonymous subtests whose closing name differs.
+      counts.passed += nested ? nested.passed : Number(Boolean(result.name.trim()) && result.diag?.type !== "suite");
+    });
+    return counts;
+  }
+  const counts = countCases(parser);
   if (start >= 0) parser.end(output.slice(start));
   if (start < 0 || extra || !parser.results?.ok || parser.results.bailout
       || /^# (?:fail|cancelled) [1-9]/m.test(output)) {
     throw new Error("test command did not produce passing TAP");
   }
-  if (!passed) throw new Error("test command passed no named test cases (zero-case plans, suites and skipped tests do not count)");
-  return passed;
+  if (!counts.passed) throw new Error("test command passed no named test cases (zero-case plans, suites and skipped tests do not count)");
+  return counts.passed;
 }
 
 export function verifyImplementation({ repo, specDir, runDir, runId, source }) {
