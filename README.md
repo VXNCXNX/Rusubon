@@ -119,7 +119,8 @@ Requirements, design, decisions and commands stay fixed after that gate. Only
 declared files, task checkboxes and completion state may change.
 
 The harness then executes every verification command, requiring passing TAP test
-cases. Empty test files and entirely skipped suites do not count. Test commands
+cases and valid plans, including nested subtests. Incomplete or malformed TAP
+stops publishing. Empty test files and entirely skipped suites do not count. Test commands
 must use the project's TAP reporter; ordinary lint/build checks use exit status.
 Each command gets two minutes. Each runner phase gets 30 minutes. Commands run
 with argv arrays and a repo-relative working directory, without shell expansion.
@@ -128,6 +129,8 @@ Run artifacts live in `.rusubon/runs/<run-id>/`: phase results, prompts, logs,
 verification receipt and `close-out.md`. The receipt binds the exact spec and
 non-ignored code contents to the checks that ran. After rechecking that evidence,
 the harness commits, pushes and creates a draft PR, then opens it for review.
+Submodules are recorded by their checked-out commit, or their indexed commit
+when uninitialized. Uncommitted changes inside submodules stop the run.
 The runner never owns publishing. These checks govern the harness workflow;
 they are not a sandbox around the user's runner or proof that test assertions
 capture every requirement.

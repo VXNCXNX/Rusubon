@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { Parser } from "tap-parser";
 import { assertReceipt, hash, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
 import { skillsDir } from "./run.mjs";
 import { redact } from "./doctor.mjs";
@@ -13,16 +14,22 @@ export function validateSpec(repo, specDir, receiptPath) {
 }
 
 export function passingTap(output, cwd) {
-  if (!/^TAP version \d+\s*$/m.test(output) || !/^\s*1\.\.\d+/m.test(output)
-      || /^\s*Bail out!/im.test(output) || /^# (?:fail|cancelled) [1-9]/m.test(output)
-      || /^\s*not ok\b(?![^\n]*# (?:SKIP|TODO)\b)/im.test(output)) {
+  // npm may print its script banner before the TAP stream starts.
+  const start = output.search(/^TAP version \d+\s*$/m);
+  const parser = new Parser({ strict: true });
+  let passed = 0;
+  let extra = false;
+  parser.on("extra", () => { extra = true; });
+  parser.on("pass", (result) => {
+    // Count leaf assertions, excluding suites and Node's empty-file subtests.
+    if (result.name.trim() && result.diag?.type !== "suite"
+        && !existsSync(resolve(cwd, result.name.trim()))) passed++;
+  });
+  if (start >= 0) parser.end(output.slice(start));
+  if (start < 0 || extra || !parser.results?.ok || parser.results.bailout
+      || /^# (?:fail|cancelled) [1-9]/m.test(output)) {
     throw new Error("test command did not produce passing TAP");
   }
-  const cases = [...output.matchAll(/^([ \t]*)ok\s+\d+\s+-\s+([^\n]+)\n([^]*?)(?=^[ \t]*(?:not )?ok\s+\d+\b|$(?![^]))/gm)];
-  const passed = cases.filter(([, , name, details]) => !/# (?:SKIP|TODO)\b/i.test(name)
-    && !/type: ['"]?suite['"]?/.test(details.split("...")[0])
-    // Node treats an empty test file as one passing file subtest. It is not a test case.
-    && !existsSync(resolve(cwd, name.trim()))).length;
   if (!passed) throw new Error("test command passed no named test cases (empty files and skipped tests do not count)");
   return passed;
 }

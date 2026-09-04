@@ -119,6 +119,32 @@ test("verification that mutates code is rejected", async () => {
   assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
 });
 
+test("exit-zero commands with invalid TAP cannot issue receipts or publish", async () => {
+  for (const tap of ["TAP version 13\nok 1 - only\n1..2\n", "TAP version 13\n1..0\nok 1 - unexpected\n"]) {
+    const f = setup();
+    await assert.rejects(f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 1) {
+        const path = join(f.latest.specDir, ".spec-state.json");
+        const state = JSON.parse(readFileSync(path));
+        state.verification[0].argv = [process.execPath, "-e", `process.stdout.write(${JSON.stringify(tap)})`];
+        writeFileSync(path, JSON.stringify(state));
+      }
+      return { status: 0 };
+    }), /did not produce passing TAP/);
+    assert.ok(!existsSync(join(dirname(f.latest.resultPath), "verification.json")));
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
+test("repositories with a clean initialized submodule complete the PR flow", async () => {
+  const f = setup();
+  git(f.repo, ["-c", "protocol.file.allow=always", "submodule", "add", "-b", "main", join(f.root, "remote.git"), "dependency"]);
+  git(f.repo, ["commit", "-am", "add dependency"]);
+  git(f.repo, ["push", "origin", "main"]);
+  assert.ok((await f.start()).url);
+});
+
 test("receipts become invalid after code, spec or log changes", async () => {
   const f = setup();
   const result = await f.start();

@@ -147,7 +147,8 @@ Old close-outs and results from other sources or runs cannot complete this run.
    Its result also supplies pr_title and pr_body, including Agent context.
 4. The harness runs every command from the spec's verification array. Commands
    use executable argv and a repo-relative cwd. Test commands emit TAP with at
-   least one named passing case; checks use exit status. Failures, empty files,
+   least one named passing case and valid test plans at every nesting level;
+   checks use exit status. Invalid TAP, failures, empty files,
    skipped-only suites, timeouts and code changes during verification stop the run.
 5. A harness receipt binds command results and logs to the run, source, spec
    and non-ignored code contents. The harness checks it before committing,
@@ -158,3 +159,6 @@ Early preflight failures do not create a run. Failed runs preserve their files
 and branch. Receipt checks govern publishing through the harness; they do not
 sandbox a runner with the user's credentials or prove test semantics. Ignored
 dependencies and environment state are outside the code-content fingerprint.
+Submodule fingerprints use the checked-out commit, or the indexed gitlink for
+an uninitialized checkout. Uncommitted submodule changes, including untracked
+files, stop the run because the parent PR cannot publish those contents.

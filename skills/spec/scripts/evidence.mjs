@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, readlinkSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -34,10 +34,21 @@ export function localPath(repo, path) {
 
 export function snapshot(repo) {
   const names = git(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]).split("\0").filter(Boolean);
+  const gitlinks = new Map(git(repo, ["ls-files", "--stage", "-z"]).split("\0")
+    .filter((entry) => entry.startsWith("160000 ")).map((entry) => {
+      const tab = entry.indexOf("\t");
+      const [, commit, stage] = entry.slice(0, tab).split(" ");
+      if (stage !== "0") throw new Error("cannot snapshot an unresolved submodule conflict");
+      return [entry.slice(tab + 1), commit];
+    }));
   const files = Object.create(null);
   for (const name of [...new Set(names)].sort()) {
     if (name.startsWith(".rusubon/runs/")) continue;
     const full = join(repo, name);
+    if (gitlinks.has(name)) {
+      files[name] = `gitlink:${submoduleCommit(full, name, gitlinks.get(name))}`;
+      continue;
+    }
     try {
       const stat = lstatSync(full);
       if (stat.isSymbolicLink()) files[name] = `link:${readlinkSync(full)}`;
@@ -48,6 +59,23 @@ export function snapshot(repo) {
     }
   }
   return { files, digest: hash(JSON.stringify(files)) };
+}
+
+function submoduleCommit(full, name, indexedCommit) {
+  if (!existsSync(full)) return indexedCommit;
+  if (!lstatSync(full).isDirectory()) throw new Error(`submodule is not a directory: ${name}`);
+  // Deinitialized submodules have no checkout, so retain the indexed gitlink.
+  if (!existsSync(join(full, ".git"))) {
+    if (readdirSync(full).length) throw new Error(`submodule has content without a checkout: ${name}`);
+    return indexedCommit;
+  }
+  if (realpathSync(git(full, ["rev-parse", "--show-toplevel"])) !== realpathSync(full)) {
+    throw new Error(`submodule checkout does not match its path: ${name}`);
+  }
+  if (git(full, ["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"])) {
+    throw new Error(`submodule has uncommitted changes: ${name}`);
+  }
+  return git(full, ["rev-parse", "HEAD"]);
 }
 
 export function changedFiles(before, after) {
