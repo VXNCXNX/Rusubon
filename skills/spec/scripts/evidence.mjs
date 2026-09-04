@@ -1,14 +1,44 @@
-import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export const hash = (value) => createHash("sha256").update(value).digest("hex");
 
-export function git(repo, args) {
-  const result = spawnSync("git", args, { cwd: repo, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
+export function git(repo, args, env) {
+  const result = spawnSync("git", args, { cwd: repo, env, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
   return result.stdout.trimEnd();
+}
+
+export function assertWorktreeMatchesHead(repo) {
+  // A fresh index has no assume-unchanged or skip-worktree flags. Git still
+  // applies the repository's normal content filters, including line endings.
+  const index = join(tmpdir(), `rusubon-index-${randomUUID()}`);
+  writeFileSync(index, "", { flag: "wx", mode: 0o600 });
+  const env = { ...process.env, GIT_INDEX_FILE: index };
+  const config = ["-c", "core.sparseCheckout=false", "-c", "core.splitIndex=false",
+    "-c", "core.ignoreStat=false", "-c", "core.fsmonitor=false", "-c", "core.filemode=true"];
+  try {
+    git(repo, [...config, "read-tree", "HEAD"], env);
+    const differences = git(repo, [...config, "diff", "--name-only", "--no-ext-diff", "--ignore-submodules=all", "HEAD", "--"], env);
+    if (differences) throw new Error(`tracked worktree differs from HEAD: ${differences}`);
+  } finally {
+    // Only this call's disposable index is removed; the checkout index is untouched.
+    unlinkSync(index);
+  }
+  for (const entry of git(repo, ["ls-tree", "-r", "-z", "HEAD"]).split("\0")) {
+    if (!entry.startsWith("160000 ")) continue;
+    const tab = entry.indexOf("\t");
+    const name = entry.slice(tab + 1);
+    const commit = entry.slice(0, tab).split(" ")[2];
+    // Git's fresh-index diff treats absent submodules as deletions. Check their
+    // commits explicitly so deinitialized checkouts remain supported.
+    if (submoduleCommit(join(repo, name), name, commit) !== commit) {
+      throw new Error(`tracked worktree differs from HEAD: ${name}`);
+    }
+  }
 }
 
 export function localPath(repo, path) {
@@ -75,6 +105,7 @@ function submoduleCommit(full, name, indexedCommit) {
   if (git(full, ["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"])) {
     throw new Error(`submodule has uncommitted changes: ${name}`);
   }
+  assertWorktreeMatchesHead(full);
   return git(full, ["rev-parse", "HEAD"]);
 }
 

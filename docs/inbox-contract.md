@@ -142,6 +142,9 @@ Old close-outs and results from other sources or runs cannot complete this run.
 2. The harness validates requirements, task coverage, decisions and verification
    commands. Only an immediately_actionable result advances. The spec's run and
    source must match, with no completed tasks or closure.
+   Each checkbox task has one nonempty Files: declaration. Stray declarations
+   and duplicate Files: lines fail validation. Validation and execution share
+   the same task parser.
 3. A new runner phase implements on a unique `codex/rusubon-*` branch. It may
    change declared task files, checkboxes and closure, but not the validated plan.
    Its result also supplies pr_title and pr_body, including Agent context.
@@ -159,6 +162,9 @@ Early preflight failures do not create a run. Failed runs preserve their files
 and branch. Receipt checks govern publishing through the harness; they do not
 sandbox a runner with the user's credentials or prove test semantics. Ignored
 dependencies and environment state are outside the code-content fingerprint.
+Before research and publishing, tracked contents must match HEAD through a
+temporary index without visibility flags. The check preserves the user's index,
+applies Git content filters, and recurses into initialized submodules.
 Count cases from TAP structure, regardless of whether their names match files.
 Node's default TAP reporter emits empty-file wrappers as passing tests with no
 distinctive TAP metadata. Receipts cannot establish whether such cases ran assertions.

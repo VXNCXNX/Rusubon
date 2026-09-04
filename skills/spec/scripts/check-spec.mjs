@@ -4,6 +4,7 @@
 import { existsSync, readFileSync, statSync, lstatSync, realpathSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
 import { assertReceipt, localPath } from "./evidence.mjs";
+import { parseTasks } from "./tasks.mjs";
 
 const [specDir, ...flags] = process.argv.slice(2);
 const receiptIndex = flags.indexOf("--receipt");
@@ -123,17 +124,15 @@ for (const [id] of criterionBlocks) {
 if (!criteria.size) fail("requirements need numbered N.M criteria");
 
 const taskText = read("tasks.md");
-const tasks = blocks(taskText, /^[ \t]*-[ \t]*\[([ xX])\][ \t]+/gm);
+const { tasks, problems: taskProblems } = parseTasks(taskText);
+taskProblems.forEach(fail);
 if (!tasks.length) fail("tasks need checkboxes");
 const cited = new Set();
 const files = new Set();
-for (const [index, [checked, block]] of tasks.entries()) {
+for (const [index, { checked, block, files: declared }] of tasks.entries()) {
   const label = `task ${index + 1}`;
   if ((complete || state.closure === "implemented") && checked === " ") fail(`${label} is incomplete`);
-  const declared = block.match(/^[ \t]*(?:[-*][ \t]*)?Files:[ \t]*(\S[^\n]*)/m);
-  if (!declared) fail(`${label} needs Files:`);
-  else for (const path of declared[1].split(",")) {
-    const name = path.trim().replace(/^`|`$/g, "");
+  for (const name of declared) {
     try { localPath(process.cwd(), name); files.add(name); }
     catch (error) { fail(`${label}: ${error.message}`); }
   }

@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, test } from "node:test";
-import { changedFiles, git, snapshot } from "../skills/spec/scripts/evidence.mjs";
+import { assertWorktreeMatchesHead, changedFiles, git, snapshot } from "../skills/spec/scripts/evidence.mjs";
 import { trashFixture } from "./helpers/cleanup.mjs";
 
 const roots = [];
@@ -50,8 +50,36 @@ test("uninitialized submodules retain the gitlink without reading unrelated cont
   const f = fixture(); const before = snapshot(f.repo);
   renameSync(f.sub, join(f.root, "saved-checkout"));
   assert.equal(snapshot(f.repo).digest, before.digest);
+  assertWorktreeMatchesHead(f.repo);
   mkdirSync(f.sub);
   assert.equal(snapshot(f.repo).digest, before.digest);
+  assertWorktreeMatchesHead(f.repo);
   writeFileSync(join(f.sub, "unknown.txt"), "untracked checkout content");
   assert.throws(() => snapshot(f.repo), /content without a checkout/);
+});
+
+test("hidden edits inside submodules invalidate snapshots and clean-checkout checks", () => {
+  const f = fixture();
+  git(f.sub, ["update-index", "--assume-unchanged", "code.txt"]);
+  writeFileSync(join(f.sub, "code.txt"), "hidden edit");
+  assert.equal(git(f.repo, ["status", "--porcelain"]), "");
+  assert.throws(() => snapshot(f.repo), /worktree.*HEAD/);
+  assert.throws(() => assertWorktreeMatchesHead(f.repo), /worktree.*HEAD/);
+});
+
+test("HEAD comparisons honor repository line-ending conversion", () => {
+  const f = fixture();
+  writeFileSync(join(f.repo, ".gitattributes"), "code.txt text eol=crlf\n");
+  writeFileSync(join(f.repo, "code.txt"), "line one\r\nline two\r\n");
+  git(f.repo, ["add", ".gitattributes", "code.txt"]);
+  git(f.repo, ["commit", "-m", "line endings"]);
+  assertWorktreeMatchesHead(f.repo);
+});
+
+test("HEAD comparisons detect executable-bit changes hidden by Git configuration", () => {
+  const f = fixture();
+  git(f.repo, ["config", "core.filemode", "false"]);
+  chmodSync(join(f.repo, "code.txt"), 0o755);
+  assert.equal(git(f.repo, ["status", "--porcelain"]), "");
+  assert.throws(() => assertWorktreeMatchesHead(f.repo), /worktree.*HEAD/);
 });

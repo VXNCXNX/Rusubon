@@ -72,6 +72,14 @@ test("complete plan accepts auto recommendations and planned regression tests", 
   assert.equal(result.status, 0, result.output);
 });
 
+test("task groups can use headings while each task retains its own declarations", () => {
+  const f = fixture();
+  f.write("tasks.md", "# Work\n\n## Retry\n" + f.tasks
+    + "\n## Documentation\n- [ ] Document retry\nFiles: `README.md`\nVerify: retry\n_Requirements: enabler_\n");
+  const result = f.run();
+  assert.equal(result.status, 0, result.output);
+});
+
 test("empty plan and malformed state fail closed", () => {
   const f = fixture();
   f.write(".spec-state.json", "null");

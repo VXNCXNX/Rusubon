@@ -78,6 +78,56 @@ test("invalid specs and early code edits stop before implementation", async () =
   }
 });
 
+test("stray and duplicate Files declarations cannot authorize changes", async () => {
+  for (const location of ["before", "duplicate", "after heading"]) {
+    const f = setup();
+    await assert.rejects(f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 1) {
+        const path = join(f.latest.specDir, "tasks.md");
+        const text = readFileSync(path, "utf8");
+        writeFileSync(path, location === "before" ? "Files: `unrelated.txt`\n" + text
+          : text + (location === "after heading" ? "\n## Notes\n" : "\n") + "Files: `unrelated.txt`\n");
+      } else writeFileSync(join(f.repo, "unrelated.txt"), "outside the task");
+      return { status: 0 };
+    }), /Files:/);
+    assert.deepEqual(f.calls, ["research"]);
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
+test("hidden worktree edits fail before research without changing index flags", async () => {
+  for (const flag of ["--assume-unchanged", "--skip-worktree"]) {
+    const f = setup();
+    git(f.repo, ["update-index", flag, "retry.mjs"]);
+    writeFileSync(join(f.repo, "retry.mjs"), "export const canRetry = () => true;\n");
+    assert.equal(git(f.repo, ["status", "--porcelain"]), "");
+    const flags = git(f.repo, ["ls-files", "-v"]);
+    await assert.rejects(f.start(), /worktree.*HEAD/);
+    assert.deepEqual(f.calls, []);
+    assert.equal(git(f.repo, ["ls-files", "-v"]), flags);
+    assert.match(readFileSync(join(f.repo, "retry.mjs"), "utf8"), /=> true/);
+  }
+});
+
+test("clean files with visibility flags do not block a valid PR", async () => {
+  const f = setup();
+  git(f.repo, ["update-index", "--assume-unchanged", ".gitignore"]);
+  assert.ok((await f.start()).url);
+  assert.match(git(f.repo, ["ls-files", "-v", ".gitignore"]), /^h /);
+});
+
+test("implementation cannot hide uncommitted changes from the publishing gate", async () => {
+  const f = setup();
+  await assert.rejects(f.start(async (...args) => {
+    await f.run(...args);
+    if (f.calls.length === 2) git(f.repo, ["update-index", "--assume-unchanged", "retry.mjs"]);
+    return { status: 0 };
+  }), /worktree.*HEAD/);
+  assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  assert.equal(git(f.repo, ["ls-remote", "origin", `refs/heads/${git(f.repo, ["branch", "--show-current"])}`]), "");
+});
+
 test("changed requirements and undeclared edits never reach publishing", async () => {
   for (const mutate of [
     (f) => { const p = join(f.latest.specDir, "requirements.md"); writeFileSync(p, readFileSync(p, "utf8").replace("allow retry", "disable retry permanently")); },

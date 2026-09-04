@@ -8,7 +8,8 @@ import { formatIssueRef, parseSource, resolveSource } from "./pr-source.mjs";
 import { buildPrPrompt } from "./pr-prompt.mjs";
 import { runWith } from "./runners.mjs";
 import { validateSpec, verifyImplementation } from "./pr-verification.mjs";
-import { assertReceipt, changedFiles, git, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
+import { assertReceipt, assertWorktreeMatchesHead, changedFiles, git, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
+import { parseTasks } from "../skills/spec/scripts/tasks.mjs";
 
 export { buildPrPrompt } from "./pr-prompt.mjs";
 
@@ -54,12 +55,13 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   git(repo, ["commit", "-m", result.pr_title]);
   // Hooks or another writer may change content during the commit.
   assertReceipt(repo, specDir, receipt);
-  if (git(repo, ["diff", "--name-only", "HEAD"])) throw new Error("uncommitted changes after commit; refusing to publish");
+  assertWorktreeMatchesHead(repo);
   const commit = git(repo, ["rev-parse", "HEAD"]);
   if (git(repo, ["branch", "--show-current"]) !== branch) throw new Error("branch changed before push");
   git(repo, ["push", "--set-upstream", "origin", `${commit}:refs/heads/${branch}`]);
   assertHead(repo, commit, branch);
   assertReceipt(repo, specDir, receipt);
+  assertWorktreeMatchesHead(repo);
   const url = gh(repo, ["pr", "create", "--draft", "--base", base, "--head", branch,
     "--title", result.pr_title, "--body-file", bodyFile]);
   // Opening the review is best effort on hosts without a browser.
@@ -76,7 +78,8 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   if (realpathSync(repo) !== realpathSync(git(repo, ["rev-parse", "--show-toplevel"]))) {
     throw new Error("run rusubon pr from the Git checkout root");
   }
-  if (git(repo, ["status", "--porcelain"])) throw new Error("rusubon pr needs a clean checkout; keep existing changes in a separate worktree or commit them first");
+  if (git(repo, ["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"])) throw new Error("rusubon pr needs a clean checkout; keep existing changes in a separate worktree or commit them first");
+  assertWorktreeMatchesHead(repo);
   const base = git(repo, ["branch", "--show-current"]);
   if (!base) throw new Error("rusubon pr needs a named base branch");
   const head = git(repo, ["rev-parse", "HEAD"]);
@@ -121,8 +124,9 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
       throw new Error("research spec has stale source, run id or completed tasks");
     }
     const plan = planHash(specDir);
-    const allowed = new Set([...readFileSync(join(specDir, "tasks.md"), "utf8").matchAll(/^\s*(?:[-*]\s*)?Files:[ \t]*(.+)$/gm)]
-      .flatMap((match) => match[1].split(",").map((path) => relative(repo, localPath(repo, path.trim().replace(/^`|`$/g, ""))))));
+    const { tasks, problems } = parseTasks(readFileSync(join(specDir, "tasks.md"), "utf8"));
+    if (problems.length) throw new Error(`invalid task declarations: ${problems.join("; ")}`);
+    const allowed = new Set(tasks.flatMap((task) => task.files.map((path) => relative(repo, localPath(repo, path)))));
     allowed.add(`${specPath}/tasks.md`);
     allowed.add(`${specPath}/.spec-state.json`);
     const branch = `codex/rusubon-${slug}-${runId}`;

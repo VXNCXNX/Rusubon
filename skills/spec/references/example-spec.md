@@ -84,6 +84,10 @@ replacement id and retain the original answer and reason. For a real blocker,
 leave the answer null, record `blocking` and close out without implementation.
 The validator rejects unresolved decisions and blockers.
 
+Put exactly one nonempty `Files:` line inside each checkbox task. Task blocks
+end at the next checkbox or Markdown heading. List every path the task may edit;
+declarations outside task blocks or repeated within a task fail validation.
+
 `Verify:` contains comma-separated command ids, not shell text. `cwd` is relative
 to the repo root. `argv` is an executable and its individual arguments, with no
 shell expansion. For lint or type checks, use `kind: "check"` and omit `format`.
