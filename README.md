@@ -103,6 +103,41 @@ If the runner session has no official PostHog MCP tools, the skill writes a clos
 | --- | --- |
 | `friction` | Capture cliffs + money-path clusters. Findings are `requires_human_input`. Launch with `rusubon run friction`. |
 | `research` | Human-launched via `rusubon pr <slug|#N|url>`. Draft PR only. Never merge. |
+| `spec` | Auto-mode requirements, design and tasks between actionable research and implementation. |
+
+`rusubon pr <slug>` runs research, then spec, implementation and verification,
+then a draft PR. The bundled spec adapts [VXNCXNX/spec-skill](https://github.com/VXNCXNX/spec-skill)
+for unattended execution: the agent selects recommended options from repo evidence
+and records the options, choice and reason in a decision ledger. It does not
+pause for spec approval or question rounds. Existing user choices take precedence.
+
+Launch from a clean checkout root on the published branch you want the PR to
+target. Its HEAD must match `origin` so unrelated local commits cannot enter the
+PR. Research writes a spec in `docs/plans/YYYY-MM-DD-<source-slug>-<run-id>/`. The harness
+validates it before starting a separate implementation phase on a unique branch.
+Requirements, design, decisions and commands stay fixed after that gate. Only
+declared files, task checkboxes and completion state may change.
+
+The harness then executes every verification command, requiring passing TAP test
+cases. Empty test files and entirely skipped suites do not count. Test commands
+must use the project's TAP reporter; ordinary lint/build checks use exit status.
+Each command gets two minutes. Each runner phase gets 30 minutes. Commands run
+with argv arrays and a repo-relative working directory, without shell expansion.
+
+Run artifacts live in `.rusubon/runs/<run-id>/`: phase results, prompts, logs,
+verification receipt and `close-out.md`. The receipt binds the exact spec and
+non-ignored code contents to the checks that ran. After rechecking that evidence,
+the harness commits, pushes and creates a draft PR, then opens it for review.
+The runner never owns publishing. These checks govern the harness workflow;
+they are not a sandbox around the user's runner or proof that test assertions
+capture every requirement.
+
+Routine implementation alternatives are resolved automatically. Missing evidence,
+conflicting requirements or missing authorization produce a `requires_human_input`
+close-out without a PR. The scout still only writes findings; a person launches
+the research-to-PR flow. Auto mode never merges or deploys. Failed runs preserve
+their branch and files for review; they never reset or discard work. Before a
+fresh run, commit the work you want to keep or use a clean worktree.
 
 ## What this is not
 

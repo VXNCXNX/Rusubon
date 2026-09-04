@@ -19,3 +19,9 @@ Expat license in the PostHog/posthog repository, including:
 The original MIT notice is in LICENSE-PostHog-MIT.
 
 Rusubon does not include any code from the PostHog `ee/` directory.
+
+The bundled skills/spec workflow and validator are adapted from
+VXNCXNX/spec-skill at commit 94b7656f9fa2e18f22234f099e5a594761a995c6
+(https://github.com/VXNCXNX/spec-skill), under the MIT license.
+The original notice is included in skills/spec/LICENSE. That skill credits
+KiroCrew's Spec Builder for the requirements/design/tasks method and ledger.

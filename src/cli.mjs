@@ -18,7 +18,7 @@ Usage:
   rusubon doctor                       preflight before a run
   rusubon run <skill>                  run a scout (friction)
   rusubon pr <slug|#N|url> [--issue|--report]
-                                       research a report or GitHub issue; draft PR
+                                       research, auto-spec, verify; draft PR
   rusubon inbox                        list open reports
   rusubon show <slug>                  print a report (open or archived)
   rusubon decline <slug> --why "…"     archive a report + write memory/noise

@@ -129,3 +129,32 @@ If those tools are not available in the runner session, write a close-out that s
 | `rusubon decline <slug> --why` | you | archive + `memory/noise` |
 
 `research` is a human-launched door (`rusubon pr`). Friction never calls it. Not the PostHog wizard. No auto-merge. No cron.
+
+## Research-to-PR execution
+
+`rusubon pr` requires a clean checkout root on a named base branch matching
+`origin`. A unique run id owns `.rusubon/runs/<run-id>/` and
+`docs/plans/<date>-<source>-<run-id>/`.
+Old close-outs and results from other sources or runs cannot complete this run.
+
+1. Research writes the auto spec and a JSON result. It does not modify product
+   code. The result includes run_id, source, phase, verdict and a nonempty reason.
+2. The harness validates requirements, task coverage, decisions and verification
+   commands. Only an immediately_actionable result advances. The spec's run and
+   source must match, with no completed tasks or closure.
+3. A new runner phase implements on a unique `codex/rusubon-*` branch. It may
+   change declared task files, checkboxes and closure, but not the validated plan.
+   Its result also supplies pr_title and pr_body, including Agent context.
+4. The harness runs every command from the spec's verification array. Commands
+   use executable argv and a repo-relative cwd. Test commands emit TAP with at
+   least one named passing case; checks use exit status. Failures, empty files,
+   skipped-only suites, timeouts and code changes during verification stop the run.
+5. A harness receipt binds command results and logs to the run, source, spec
+   and non-ignored code contents. The harness checks it before committing,
+   pushing and creating a draft PR. It opens the PR for review and never merges.
+
+The harness writes `close-out.md` for completed phases and workflow failures.
+Early preflight failures do not create a run. Failed runs preserve their files
+and branch. Receipt checks govern publishing through the harness; they do not
+sandbox a runner with the user's credentials or prove test semantics. Ignored
+dependencies and environment state are outside the code-content fingerprint.
