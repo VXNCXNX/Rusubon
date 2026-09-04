@@ -20,9 +20,11 @@ import {
 import { POSTHOG_CLOUD, initConfig, loadConfig, pkgRoot, resolveHost } from "../src/config.mjs";
 import { PLACEHOLDER, assertContextReady } from "../src/context.mjs";
 import { decline } from "../src/decline.mjs";
-import { assertReady, collectChecks, formatDoctor, posthogMcpOk } from "../src/doctor.mjs";
+import { assertReady, collectChecks, collectPrChecks, formatDoctor, posthogMcpOk } from "../src/doctor.mjs";
 import { formatInboxLine, listInbox, parseReport, showReport } from "../src/inbox.mjs";
 import { formatIndex, parseKey, remember } from "../src/memory.mjs";
+import { buildPrPrompt } from "../src/pr.mjs";
+import { parseSource, resolveSource } from "../src/pr-source.mjs";
 import { buildPrompt, loadSkill } from "../src/run.mjs";
 import { formatDuration, formatRunSummary, snapshotState, summarizeRun } from "../src/summary.mjs";
 
@@ -413,4 +415,97 @@ test("assertDraftAllowed refuses a filled context without --force", () => {
   assert.doesNotThrow(() => assertDraftAllowed(`${PLACEHOLDER}\n# Product\n`, false));
   assert.throws(() => assertDraftAllowed("# Product\nfilled\n", false), /already filled/);
   assert.doesNotThrow(() => assertDraftAllowed("# Product\nfilled\n", true));
+});
+
+test("parseSource accepts URL, owner/repo#N, #12, 12, slug; flags conflict", () => {
+  assert.deepEqual(parseSource("https://github.com/acme/app/issues/12"), {
+    kind: "issue",
+    owner: "acme",
+    repo: "app",
+    number: 12,
+  });
+  assert.deepEqual(parseSource("acme/app#12"), {
+    kind: "issue",
+    owner: "acme",
+    repo: "app",
+    number: 12,
+  });
+  assert.deepEqual(parseSource("#12"), { kind: "issue", number: 12 });
+  assert.deepEqual(parseSource("12"), { kind: "issue", number: 12 });
+  assert.deepEqual(parseSource("checkout-gate"), { kind: "report", slug: "checkout-gate" });
+  assert.deepEqual(parseSource("12", { report: true }), { kind: "report", slug: "12" });
+  assert.deepEqual(parseSource("acme/app#12", { issue: true }), {
+    kind: "issue",
+    owner: "acme",
+    repo: "app",
+    number: 12,
+  });
+  assert.throws(() => parseSource("checkout-gate", { issue: true, report: true }), /--issue|--report|not both/);
+});
+
+test("buildPrPrompt mentions writing-pr-descriptions, --draft, no merge, five passes", () => {
+  const prompt = buildPrPrompt(
+    { kind: "report", slug: "checkout-gate", body: "# Checkout gate\n\nstep vs baseline\n" },
+    { runner: "claude", posthog: { projectId: "YOUR_PROJECT_ID", host: "YOUR_REGION" } },
+  );
+  assert.match(prompt, /writing-pr-descriptions/);
+  assert.match(prompt, /--draft/);
+  assert.match(prompt, /[Nn]ever merge|no merge/);
+  assert.match(prompt, /five passes/);
+  assert.doesNotMatch(prompt, /RUSUBON_CONTEXT_PLACEHOLDER/);
+});
+
+test("main run research rejects with rusubon pr", async () => {
+  await assert.rejects(() => main(["run", "research"]), /rusubon pr/);
+});
+
+test("collectPrChecks does not include mcp/project; fails without gh", () => {
+  tmp();
+  initConfig();
+  const checks = collectPrChecks(loadConfig(), okProbes);
+  assert.equal(checks.some((c) => c.name === "mcp"), false);
+  assert.equal(checks.some((c) => c.name === "project"), false);
+  assert.equal(checks.some((c) => c.name === "host"), false);
+  assert.equal(checks.some((c) => c.name === "context"), false);
+  assert.match(formatDoctor(checks), /fail\s+gh/);
+});
+
+test("resolveSource report reads inbox file", () => {
+  tmp();
+  initConfig();
+  writeFileSync(".rusubon/inbox/reports/checkout-gate.md", "# Checkout gate\n\nstep vs baseline\n");
+  const src = resolveSource(parseSource("checkout-gate"), {});
+  assert.equal(src.kind, "report");
+  assert.equal(src.slug, "checkout-gate");
+  assert.match(src.body, /step vs baseline/);
+});
+
+test("resolveSource issue mismatches repo", () => {
+  const probes = {
+    ghRepo: () => ({ status: 0, out: JSON.stringify({ nameWithOwner: "acme/app" }) }),
+    ghIssue: () => ({ status: 0, out: JSON.stringify({ number: 9, title: "x", body: "y" }) }),
+  };
+  assert.throws(
+    () => resolveSource(parseSource("other/repo#9"), probes),
+    /run from that checkout/,
+  );
+});
+
+test("friction buildPrompt still says no PR / no GitHub", () => {
+  tmp();
+  initConfig();
+  fillContext();
+  const prompt = buildPrompt(loadSkill("friction"), {
+    posthog: { projectId: "123", host: "https://us.posthog.com" },
+    runner: "claude",
+  });
+  assert.match(prompt, /no PR/i);
+  assert.match(prompt, /no GitHub/i);
+  assert.match(prompt, /Never open a PR/);
+});
+
+test("writing-pr-descriptions SKILL exists and mentions Pass 1 and Agent context", () => {
+  const text = readFileSync(join(pkgRoot(), "skills", "writing-pr-descriptions", "SKILL.md"), "utf8");
+  assert.match(text, /Pass 1/);
+  assert.match(text, /Agent context/);
 });

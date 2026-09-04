@@ -5,7 +5,7 @@
 PostHog already recorded the sessions. You already pay for Claude, Cursor, or Codex.
 Rusubon runs a scout on that login, through official PostHog MCP, and writes friction findings as markdown in your product repo.
 
-A finding is a file: a path, a step that broke vs that path's baseline, enough people that it isn't one angry session. You `show` it. You `decline --why` when it's noise or a gate you meant to have. Next run can skip it. Nothing opens a PR or a GitHub issue.
+A finding is a file: a path, a step that broke vs that path's baseline, enough people that it isn't one angry session. You `show` it. You `decline --why` when it's noise or a gate you meant to have. Next run can skip it. Friction never opens a PR or a GitHub issue. A human can launch `rusubon pr` after a report.
 
 `rusubon init` in the **product** repo (not this package). Then `rusubon run friction`.
 `doctor` refuses if `.rusubon/context.md` is still a placeholder, the runner isn't logged in, or PostHog MCP is missing.
@@ -51,6 +51,7 @@ rusubon inbox
 rusubon show <slug>
 rusubon decline <slug> --why "intentional EU checkout gate"
 rusubon remember pattern/capture-baseline still quiet week of …
+rusubon pr <slug>
 ```
 
 `run` on Claude is two passes: SQL first (capture, Vision, rage concentration), then a low-effort read of sessions that hit a money path *and* a cheap signal (rage, dead click, exception, Vision tag). Sub-agents scan those ids in parallel. The parent writes 0–3 reports. A report is a quantified title, a step vs that path's baseline, and a Series table of numbers already queried. Cap 100 sessions or 45 minutes. Cursor and Codex stop after SQL.
@@ -96,18 +97,18 @@ If the runner session has no official PostHog MCP tools, the skill writes a clos
 
 ## Skills
 
-`friction` is the command you run. `research` stays a file on purpose: you launch it only after a report names a file.
+`friction` is the scout. After a report, a human can launch `rusubon pr`. Friction never opens a PR.
 
 | Skill | Job |
 | --- | --- |
-| `friction` | Capture cliffs + money-path clusters. Findings are `requires_human_input`. |
-| `research` | Bundled file only. Manual, after a report that names a file. |
+| `friction` | Capture cliffs + money-path clusters. Findings are `requires_human_input`. Launch with `rusubon run friction`. |
+| `research` | Human-launched via `rusubon pr <slug|#N|url>`. Draft PR only. Never merge. |
 
 ## What this is not
 
 - A PostHog Cloud feature, or a fork you self-host
 - A standing Replay Vision / Gemini scanner
-- An Inbox UI or an auto-PR. No cron.
+- An Inbox UI or an auto-PR. No cron. No auto-merge. Not the PostHog wizard.
 - A hosted AI reseller
 
 ## License

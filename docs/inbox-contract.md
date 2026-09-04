@@ -54,7 +54,7 @@ If the index exceeds ~80 keys, friction only sees `pattern`, `noise`, and `dedup
 
 ## Reports
 
-A report is `.rusubon/inbox/reports/<slug>.md`. Shape: `templates/report.md`. The file is the issue. Nothing opens Linear or GitHub.
+A report is `.rusubon/inbox/reports/<slug>.md`. Shape: `templates/report.md`. The file is the issue. Friction never opens Linear, GitHub, or a PR. A human can launch `rusubon pr <slug>` (or an issue) to research a cause and open a draft PR. Never merge. No cron.
 
 Required lines (plain text, not YAML):
 
@@ -122,9 +122,10 @@ If those tools are not available in the runner session, write a close-out that s
 | `rusubon context draft` | you | propose `context.md` (placeholder stays) |
 | `rusubon doctor` | you | preflight (context, projectId, host us\|eu, runner, MCP) |
 | `rusubon run friction` | you | two-phase scout on Claude (SQL then session read); then inbox |
+| `rusubon pr <slug\|#N\|url>` | you | research a report or GitHub issue; draft PR only. Never merge |
 | `rusubon inbox` | you | list open reports |
 | `rusubon show <slug>` | you | print a report (open or archived) |
 | `rusubon remember prefix/slug …` | you or agent | upsert memory file |
 | `rusubon decline <slug> --why` | you | archive + `memory/noise` |
 
-`research` is a bundled skill file only. Do not treat it as v0.
+`research` is a human-launched door (`rusubon pr`). Friction never calls it. Not the PostHog wizard. No auto-merge. No cron.

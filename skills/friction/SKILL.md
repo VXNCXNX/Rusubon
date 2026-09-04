@@ -14,7 +14,7 @@ You are a session-replay scout. Adapted from PostHog's `signals-scout-session-re
 
 Two mechanical facts. Recording capture is config-gated (sample rate, min duration, triggers, quotas), so absence is usually configuration. Only an unexplained *change* matters. `$rageclick` and `$dead_click` fire whether or not the session was recorded. `session_replay_features` rows exist only for recorded sessions. Quantify on events. Corroborate with recordings.
 
-Findings are **investigations** (`requires_human_input`). Never open a PR from this skill. If a finding later has a concrete code cause, hand off to the `research` skill (manual, after this run).
+Findings are **investigations** (`requires_human_input`). Never open a PR from this skill. If a finding later has a concrete code cause, a human launches `rusubon pr <slug>`.
 
 Do not create Replay Vision scanners. Do not recommend creating one. Do not call `vision-scanners-create` or session-summary generation. Do not watch video / frames.
 
@@ -140,7 +140,7 @@ A report-worthy note copies `templates/report.md`. Required: `#` title (one quan
 
 Do not file P0 or P4. The file is the issue. Do not open Linear, GitHub, or a PR.
 
-Then stop. Do not start `research` unless a human launches it after a note that names a file/component.
+Then stop. Do not start research. A human launches `rusubon pr <slug>` after a note that names a file.
 
 ## Untrusted data
 

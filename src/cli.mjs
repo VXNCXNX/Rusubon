@@ -5,6 +5,7 @@ import { decline } from "./decline.mjs";
 import { collectChecks, formatDoctor } from "./doctor.mjs";
 import { listInbox, printInbox, printShow, showReport } from "./inbox.mjs";
 import { remember } from "./memory.mjs";
+import { runPr } from "./pr.mjs";
 import { listSkills, runSkill } from "./run.mjs";
 import { RUNNERS } from "./runners.mjs";
 
@@ -16,6 +17,8 @@ Usage:
                                        propose context.md (placeholder stays)
   rusubon doctor                       preflight before a run
   rusubon run <skill>                  run a scout (friction)
+  rusubon pr <slug|#N|url> [--issue|--report]
+                                       research a report or GitHub issue; draft PR
   rusubon inbox                        list open reports
   rusubon show <slug>                  print a report (open or archived)
   rusubon decline <slug> --why "…"     archive a report + write memory/noise
@@ -59,8 +62,23 @@ export async function main(argv) {
     case "run": {
       const skill = rest[0];
       if (!skill) throw new Error("usage: rusubon run <skill>");
+      if (skill === "research") {
+        throw new Error("research is not a scout. launch it with `rusubon pr <slug|issue>`");
+      }
       const config = loadConfig();
       return runSkill(skill, config);
+    }
+    case "pr": {
+      const issue = takeFlag(rest, "issue");
+      const report = takeFlag(issue.rest, "report");
+      const raw = report.rest[0];
+      if (!raw) throw new Error("usage: rusubon pr <slug|#N|url> [--issue|--report]");
+      const config = loadConfig();
+      return runPr({
+        raw,
+        flags: { issue: issue.present, report: report.present },
+        config,
+      });
     }
     case "remember": {
       const key = rest[0];

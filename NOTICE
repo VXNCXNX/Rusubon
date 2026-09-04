@@ -14,6 +14,7 @@ Expat license in the PostHog/posthog repository, including:
   products/desktop/packages/ui/src/features/canvas/contextPrompt.ts
     (discovery/seed/untrusted-source shape only; we do not copy
     their unattended MCP publish)
+  .agents/skills/writing-pr-descriptions/SKILL.md
 
 The original MIT notice is in LICENSE-PostHog-MIT.
 

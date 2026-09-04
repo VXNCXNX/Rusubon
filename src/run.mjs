@@ -101,7 +101,15 @@ ${hogql ? `\n# HogQL reference\n${hogql}\n` : ""}${
   }`;
 }
 
+const SCOUTS = new Set(["friction"]);
+
 export async function runSkill(name, config, probes) {
+  if (name === "research") {
+    throw new Error("research is not a scout. launch it with `rusubon pr <slug|issue>`");
+  }
+  if (!SCOUTS.has(name)) {
+    throw new Error(`${name} is not a scout. launch research with \`rusubon pr <slug|issue>\``);
+  }
   assertReady(config, probes);
   const skill = loadSkill(name);
   mkdirSync(runsDir(), { recursive: true });

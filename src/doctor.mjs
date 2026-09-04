@@ -49,6 +49,23 @@ export function defaultProbes() {
       const bin = which("agent") || "agent";
       return runCmd(bin, ["mcp", "list"]).out;
     },
+    ghAuth() {
+      return runCmd("gh", ["auth", "status"]);
+    },
+    ghRepo() {
+      return runCmd("gh", ["repo", "view", "--json", "nameWithOwner"]);
+    },
+    ghIssue(number, repo) {
+      return runCmd("gh", [
+        "issue",
+        "view",
+        String(number),
+        "--repo",
+        repo,
+        "--json",
+        "number,title,body,url,state,labels",
+      ]);
+    },
   };
 }
 
@@ -176,6 +193,19 @@ function checkMcp(config, probes) {
   };
 }
 
+function checkGh(probes) {
+  if (typeof probes.ghAuth !== "function") {
+    return { name: "gh", ok: false, detail: "gh not authenticated. run `gh auth login`" };
+  }
+  const r = probes.ghAuth();
+  if (r && r.status === 0) return { name: "gh", ok: true, detail: "gh authenticated" };
+  return {
+    name: "gh",
+    ok: false,
+    detail: redact(r?.out) || "gh not authenticated. run `gh auth login`",
+  };
+}
+
 export function collectChecks(config, probes = defaultProbes()) {
   const local = [checkConfig(config), checkProject(config), checkHost(config), checkContext()];
   if (local.some((c) => !c.ok)) return local;
@@ -187,8 +217,17 @@ export function collectChecks(config, probes = defaultProbes()) {
   ];
 }
 
-export function formatDoctor(checks) {
-  const lines = ["rusubon doctor", ""];
+export function collectPrChecks(config, probes = defaultProbes()) {
+  return [
+    checkConfig(config),
+    checkRunner(config, probes),
+    checkAuth(config, probes),
+    checkGh(probes),
+  ];
+}
+
+export function formatDoctor(checks, title = "rusubon doctor") {
+  const lines = [title, ""];
   for (const c of checks) {
     const mark = c.ok ? "ok  " : "fail";
     lines.push(`${mark}  ${c.name.padEnd(8)}  ${redact(c.detail)}`);
@@ -202,5 +241,14 @@ export function assertReady(config, probes = defaultProbes()) {
   if (!failed.length) return checks;
   throw new Error(
     `${formatDoctor(checks)}\n\nfix the failed checks, then \`rusubon run\`.`,
+  );
+}
+
+export function assertPrReady(config, probes = defaultProbes()) {
+  const checks = collectPrChecks(config, probes);
+  const failed = checks.filter((c) => !c.ok);
+  if (!failed.length) return checks;
+  throw new Error(
+    `${formatDoctor(checks, "rusubon pr")}\n\nfix the failed checks, then \`rusubon pr\`.`,
   );
 }
