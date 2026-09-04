@@ -78,6 +78,51 @@ test("invalid specs and early code edits stop before implementation", async () =
   }
 });
 
+test("research auxiliary files cannot enter the draft PR", async () => {
+  for (const name of ["notes.md", "copied/source.json", "requirements.md.bak"]) {
+    const f = setup();
+    await assert.rejects(f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 1) {
+        const path = join(f.latest.specDir, name);
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, "unvalidated research artifact");
+      }
+      return { status: 0 };
+    }), /unexpected spec entry/);
+    assert.deepEqual(f.calls, ["research"]);
+    assert.equal(git(f.repo, ["branch", "--show-current"]), "main");
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
+test("ignored research artifacts still fail the spec directory check", async () => {
+  const f = setup();
+  writeFileSync(join(f.repo, ".git/info/exclude"), "notes.md\n");
+  await assert.rejects(f.start(async (...args) => {
+    await f.run(...args);
+    writeFileSync(join(f.latest.specDir, "notes.md"), "ignored artifact");
+    return { status: 0 };
+  }), /unexpected spec entry: notes.md/);
+  assert.deepEqual(f.calls, ["research"]);
+  assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+});
+
+test("implementation cannot add auxiliary spec files even when a task names them", async () => {
+  const f = setup();
+  await assert.rejects(f.start(async (...args) => {
+    await f.run(...args);
+    if (f.calls.length === 1) {
+      const path = join(f.latest.specDir, "tasks.md");
+      writeFileSync(path, readFileSync(path, "utf8").replace("Files:", `Files: \`${f.latest.specPath}/notes.md\`,`));
+    } else writeFileSync(join(f.latest.specDir, "notes.md"), "auxiliary implementation artifact");
+    return { status: 0 };
+  }), /unexpected spec entry: notes.md/);
+  assert.deepEqual(f.calls, ["research", "implementation"]);
+  assert.ok(!existsSync(join(dirname(f.latest.resultPath), "verification.json")));
+  assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+});
+
 test("stray and duplicate Files declarations cannot authorize changes", async () => {
   for (const location of ["before", "duplicate", "after heading"]) {
     const f = setup();

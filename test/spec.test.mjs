@@ -72,6 +72,14 @@ test("complete plan accepts auto recommendations and planned regression tests", 
   assert.equal(result.status, 0, result.output);
 });
 
+test("quick specs reject design files that are outside their validated file set", () => {
+  const f = fixture();
+  f.state.type = "quick"; f.save();
+  const result = f.run();
+  assert.equal(result.status, 1);
+  assert.match(result.output, /unexpected spec entry: design.md/);
+});
+
 test("task groups can use headings while each task retains its own declarations", () => {
   const f = fixture();
   f.write("tasks.md", "# Work\n\n## Retry\n" + f.tasks

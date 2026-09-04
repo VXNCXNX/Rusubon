@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Auto-mode adaptation of VXNCXNX/spec-skill. See ../LICENSE.
 // Read-only validation. Never executes commands found in a spec.
-import { existsSync, readFileSync, statSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, lstatSync, realpathSync } from "node:fs";
 import { resolve, join, relative } from "node:path";
-import { assertReceipt, localPath } from "./evidence.mjs";
+import { assertReceipt, localPath, specFiles } from "./evidence.mjs";
 import { parseTasks } from "./tasks.mjs";
 
 const [specDir, ...flags] = process.argv.slice(2);
@@ -48,6 +48,14 @@ try {
 }
 if (state.mode !== "auto") fail("mode must be auto");
 if (!["quick", "bug", "feature"].includes(state.type)) fail("type must be quick, bug or feature");
+try {
+  const expected = new Set(specFiles(state.type));
+  for (const name of readdirSync(resolve(specDir))) {
+    if (!expected.has(name)) fail(`unexpected spec entry: ${name}`);
+  }
+} catch (error) {
+  fail(`cannot read spec directory: ${error.message}`);
+}
 if (![1, 2, 3].includes(state.tier)) fail("tier must be 1, 2 or 3");
 for (const field of ["source", "risk_reason", "run_id"]) {
   if (!nonempty(state[field])) fail(`${field} is required`);

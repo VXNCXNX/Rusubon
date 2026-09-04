@@ -142,6 +142,9 @@ Old close-outs and results from other sources or runs cannot complete this run.
 2. The harness validates requirements, task coverage, decisions and verification
    commands. Only an immediately_actionable result advances. The spec's run and
    source must match, with no completed tasks or closure.
+   The spec directory contains only requirements.md, tasks.md, .spec-state.json,
+   and design.md for bugs or features. Extra entries, including ignored files
+   and nested directories, fail validation before implementation or verification.
    Each checkbox task has one nonempty Files: declaration. Stray declarations
    and duplicate Files: lines fail validation. Validation and execution share
    the same task parser.

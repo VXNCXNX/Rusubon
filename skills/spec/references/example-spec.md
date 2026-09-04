@@ -3,6 +3,10 @@
 The paths and behavior below are illustrative. Replace them with evidence from
 the product checkout. Read its instructions before choosing commands or scope.
 
+The spec directory contains only `requirements.md`, `tasks.md` and
+`.spec-state.json`, plus `design.md` for bugs and features. Put research notes
+and evidence in the requirements; keep separate artifacts out of this directory.
+
 `requirements.md`:
 
 ```markdown

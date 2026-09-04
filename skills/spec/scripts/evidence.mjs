@@ -6,6 +6,9 @@ import { spawnSync } from "node:child_process";
 
 export const hash = (value) => createHash("sha256").update(value).digest("hex");
 
+export const specFiles = (type) => ["requirements.md", "tasks.md", ".spec-state.json",
+  ...(type === "quick" ? [] : ["design.md"])];
+
 export function git(repo, args, env) {
   const result = spawnSync("git", args, { cwd: repo, env, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
@@ -117,7 +120,7 @@ export function changedFiles(before, after) {
 export function planHash(dir) {
   const state = JSON.parse(readFileSync(join(dir, ".spec-state.json"), "utf8"));
   delete state.closure;
-  const files = ["requirements.md", "tasks.md", ...(state.type === "quick" ? [] : ["design.md"])];
+  const files = specFiles(state.type).filter((name) => name !== ".spec-state.json");
   return hash(JSON.stringify({ state, files: files.map((file) => {
     const text = readFileSync(join(dir, file), "utf8");
     return [file, file === "tasks.md" ? text.replace(/^(\s*-\s*\[)[xX](\])/gm, "$1 $2") : text];

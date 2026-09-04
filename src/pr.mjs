@@ -8,7 +8,7 @@ import { formatIssueRef, parseSource, resolveSource } from "./pr-source.mjs";
 import { buildPrPrompt } from "./pr-prompt.mjs";
 import { runWith } from "./runners.mjs";
 import { validateSpec, verifyImplementation } from "./pr-verification.mjs";
-import { assertReceipt, assertWorktreeMatchesHead, changedFiles, git, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
+import { assertReceipt, assertWorktreeMatchesHead, changedFiles, git, localPath, planHash, snapshot, specFiles } from "../skills/spec/scripts/evidence.mjs";
 import { parseTasks } from "../skills/spec/scripts/tasks.mjs";
 
 export { buildPrPrompt } from "./pr-prompt.mjs";
@@ -116,7 +116,7 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     if (research.verdict !== "immediately_actionable") return finish(research.verdict, research.reason);
     validateSpec(repo, specDir);
     const state = JSON.parse(readFileSync(join(specDir, ".spec-state.json"), "utf8"));
-    for (const name of ["requirements.md", "tasks.md", ".spec-state.json", ...(state.type === "quick" ? [] : ["design.md"])]) {
+    for (const name of specFiles(state.type)) {
       if (!Object.hasOwn(planned.files, `${specPath}/${name}`)) throw new Error("spec files must not be ignored; the draft PR must include the validated plan");
     }
     if (state.run_id !== runId || state.source !== label || state.closure !== undefined
