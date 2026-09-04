@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 import { Parser } from "tap-parser";
 import { assertReceipt, hash, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
 import { skillsDir } from "./run.mjs";
@@ -13,7 +13,7 @@ export function validateSpec(repo, specDir, receiptPath) {
   if (result.status !== 0) throw new Error(`spec validation failed: ${result.stdout || ""}${result.stderr || result.error?.message || ""}`);
 }
 
-export function passingTap(output, cwd) {
+export function passingTap(output) {
   // npm may print its script banner before the TAP stream starts.
   const start = output.search(/^TAP version \d+\s*$/m);
   const parser = new Parser({ strict: true });
@@ -21,16 +21,16 @@ export function passingTap(output, cwd) {
   let extra = false;
   parser.on("extra", () => { extra = true; });
   parser.on("pass", (result) => {
-    // Count leaf assertions, excluding suites and Node's empty-file subtests.
-    if (result.name.trim() && result.diag?.type !== "suite"
-        && !existsSync(resolve(cwd, result.name.trim()))) passed++;
+    // The parser excludes closing subtest points; suite metadata excludes empty suites.
+    // A test name can be any string, including an existing repository path.
+    if (result.name.trim() && result.diag?.type !== "suite") passed++;
   });
   if (start >= 0) parser.end(output.slice(start));
   if (start < 0 || extra || !parser.results?.ok || parser.results.bailout
       || /^# (?:fail|cancelled) [1-9]/m.test(output)) {
     throw new Error("test command did not produce passing TAP");
   }
-  if (!passed) throw new Error("test command passed no named test cases (empty files and skipped tests do not count)");
+  if (!passed) throw new Error("test command passed no named test cases (zero-case plans, suites and skipped tests do not count)");
   return passed;
 }
 
@@ -57,7 +57,7 @@ export function verifyImplementation({ repo, specDir, runDir, runId, source }) {
     if (result.status !== 0 || result.error || result.signal) {
       throw new Error(`verification ${command.id} failed (${result.error?.code || result.signal || result.status}); see ${log}`);
     }
-    const passed = command.kind === "test" ? passingTap(result.stdout, working) : undefined;
+    const passed = command.kind === "test" ? passingTap(result.stdout) : undefined;
     commands.push({ id: command.id, argv: command.argv, cwd: command.cwd, kind: command.kind,
       exit_code: result.status, passed, log: relative(repo, log), log_hash: hash(output) });
     if (snapshot(repo).digest !== tree || planHash(specDir) !== plan) {

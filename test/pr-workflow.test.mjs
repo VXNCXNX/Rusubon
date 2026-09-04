@@ -92,10 +92,9 @@ test("changed requirements and undeclared edits never reach publishing", async (
   }
 });
 
-test("failed, empty and skipped tests do not produce receipts or PRs", async () => {
+test("failed and skipped tests do not produce receipts or PRs", async () => {
   for (const testCode of [
     "import {test} from 'node:test'; test('failure',()=>{throw Error('broken')});",
-    "// no test cases",
     "import {test} from 'node:test'; test.skip('skipped',()=>{});",
   ]) {
     const f = setup();
@@ -106,6 +105,23 @@ test("failed, empty and skipped tests do not produce receipts or PRs", async () 
     }), /verification .* failed|no named test/);
     assert.ok(!existsSync(join(dirname(f.latest.resultPath), "verification.json")));
     assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
+test("real tests named after existing files and directories can publish", async () => {
+  for (const name of ["retry.mjs", "test", "test/retry.test.mjs"]) {
+    const f = setup();
+    const result = await f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 2) writeFileSync(join(f.repo, "test/retry.test.mjs"),
+        "import {test} from 'node:test'; import assert from 'node:assert/strict';\n"
+        + "import {canRetry} from '../retry.mjs';\n"
+        + `test(${JSON.stringify(name)},()=>assert.equal(canRetry(false,true),true));\n`);
+      return { status: 0 };
+    });
+    assert.ok(result.url);
+    const receipt = JSON.parse(readFileSync(join(dirname(result.closeOut), "verification.json")));
+    assert.equal(receipt.commands[0].passed, 1, name);
   }
 });
 
@@ -120,7 +136,7 @@ test("verification that mutates code is rejected", async () => {
 });
 
 test("exit-zero commands with invalid TAP cannot issue receipts or publish", async () => {
-  for (const tap of ["TAP version 13\nok 1 - only\n1..2\n", "TAP version 13\n1..0\nok 1 - unexpected\n"]) {
+  for (const tap of ["TAP version 13\nok 1 - only\n1..2\n", "TAP version 13\n1..0\nok 1 - unexpected\n", "TAP version 13\n1..0\n"]) {
     const f = setup();
     await assert.rejects(f.start(async (...args) => {
       await f.run(...args);
@@ -131,7 +147,7 @@ test("exit-zero commands with invalid TAP cannot issue receipts or publish", asy
         writeFileSync(path, JSON.stringify(state));
       }
       return { status: 0 };
-    }), /did not produce passing TAP/);
+    }), /did not produce passing TAP|no named test/);
     assert.ok(!existsSync(join(dirname(f.latest.resultPath), "verification.json")));
     assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
   }

@@ -90,7 +90,9 @@ shell expansion. For lint or type checks, use `kind: "check"` and omit `format`.
 At least one command must be a test emitting TAP. An npm test script can use
 `["npm", "test", "--", "--test-reporter=tap"]` if it forwards those flags to Node.
 Choose the installed runner's TAP reporter. The harness requires named passing
-test cases; empty test files and skipped-only suites do not count. If the repo
+test cases; zero-case plans and skipped-only suites do not count. Inspect the
+tests for actual assertions: Node's default TAP reporter reports empty files as
+passing tests, which the harness cannot distinguish from real named cases. If the repo
 cannot emit TAP, return a blocker identifying the missing reporter. Fabricated
 TAP output is not test evidence.
 

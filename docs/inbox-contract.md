@@ -148,7 +148,7 @@ Old close-outs and results from other sources or runs cannot complete this run.
 4. The harness runs every command from the spec's verification array. Commands
    use executable argv and a repo-relative cwd. Test commands emit TAP with at
    least one named passing case and valid test plans at every nesting level;
-   checks use exit status. Invalid TAP, failures, empty files,
+   checks use exit status. Invalid TAP, failures, zero-case plans,
    skipped-only suites, timeouts and code changes during verification stop the run.
 5. A harness receipt binds command results and logs to the run, source, spec
    and non-ignored code contents. The harness checks it before committing,
@@ -159,6 +159,9 @@ Early preflight failures do not create a run. Failed runs preserve their files
 and branch. Receipt checks govern publishing through the harness; they do not
 sandbox a runner with the user's credentials or prove test semantics. Ignored
 dependencies and environment state are outside the code-content fingerprint.
+Count cases from TAP structure, regardless of whether their names match files.
+Node's default TAP reporter emits empty-file wrappers as passing tests with no
+distinctive TAP metadata. Receipts cannot establish whether such cases ran assertions.
 Submodule fingerprints use the checked-out commit, or the indexed gitlink for
 an uninitialized checkout. Uncommitted submodule changes, including untracked
 files, stop the run because the parent PR cannot publish those contents.

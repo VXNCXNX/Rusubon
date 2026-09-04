@@ -120,10 +120,13 @@ declared files, task checkboxes and completion state may change.
 
 The harness then executes every verification command, requiring passing TAP test
 cases and valid plans, including nested subtests. Incomplete or malformed TAP
-stops publishing. Empty test files and entirely skipped suites do not count. Test commands
+stops publishing. Zero-case plans and entirely skipped suites do not count. Test commands
 must use the project's TAP reporter; ordinary lint/build checks use exit status.
 Each command gets two minutes. Each runner phase gets 30 minutes. Commands run
 with argv arrays and a repo-relative working directory, without shell expansion.
+Node's default TAP reporter represents an empty test file as a passing test.
+TAP alone cannot distinguish that wrapper from a real test with the same name;
+verification does not certify that the reported cases contain assertions.
 
 Run artifacts live in `.rusubon/runs/<run-id>/`: phase results, prompts, logs,
 verification receipt and `close-out.md`. The receipt binds the exact spec and
