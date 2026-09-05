@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { afterEach, test } from "node:test";
 import { runPr } from "../src/pr.mjs";
-import { RUNNERS } from "../src/runners.mjs";
+import { RUNNERS, runWith } from "../src/runners.mjs";
 import { assertReceipt, git } from "../skills/spec/scripts/evidence.mjs";
 import { fixture } from "./helpers/pr-fixture.mjs";
 
@@ -353,6 +353,19 @@ test("runner timeouts and wrong-run results fail even with exit zero", async () 
     const result = JSON.parse(readFileSync(f.latest.resultPath)); result.run_id = "previous";
     writeFileSync(f.latest.resultPath, JSON.stringify(result)); return { status: 0 };
   }), /wrong run/);
+});
+
+test("a real runner timeout writes a failure close-out and never publishes", async () => {
+  const f = setup();
+  writeFileSync(join(f.root, "bin/codex"), `#!${process.execPath}\n`
+    + "process.on('SIGTERM', () => {});\nsetTimeout(() => process.exit(0), 2000);\n", { mode: 0o755 });
+  await assert.rejects(f.start((runner, prompt, options) => runWith(runner, prompt,
+    { ...options, timeoutMs: 500 })), /research runner timed out/);
+  const runs = join(f.repo, ".rusubon/runs");
+  const [runId] = readdirSync(runs);
+  assert.match(readFileSync(join(runs, runId, "close-out.md"), "utf8"),
+    /Verdict: requires_human_input[\s\S]*research runner timed out/);
+  assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
 });
 
 test("unpublished base commits fail before dispatch", async () => {

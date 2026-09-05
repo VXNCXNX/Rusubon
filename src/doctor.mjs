@@ -17,8 +17,9 @@ export function redact(text) {
     .replace(/Bearer\s+\S+/gi, "Bearer REDACTED");
 }
 
+/** Run a preflight probe with a 15-second deadline and return status plus combined output. */
 function runCmd(bin, args) {
-  const r = spawnSync(bin, args, { encoding: "utf8", timeout: 15000 });
+  const r = spawnSync(bin, args, { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL" });
   return {
     status: r.status,
     out: `${r.stdout || ""}\n${r.stderr || ""}`.trim(),

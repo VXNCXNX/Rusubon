@@ -137,6 +137,10 @@ If those tools are not available in the runner session, write a close-out that s
 `origin`. A unique run id owns `.rusubon/runs/<run-id>/` and
 `docs/plans/<date>-<source>-<run-id>/`.
 Old close-outs and results from other sources or runs cannot complete this run.
+Runner phases have a 30-minute deadline; each verification command has two minutes.
+Timed subprocesses receive SIGKILL at their deadline so a SIGTERM handler cannot
+keep the launched process running. A phase timeout writes a failure close-out;
+a verification timeout also prevents issuing a receipt.
 
 1. Research writes the auto spec and a JSON result. It does not modify product
    code. The result includes run_id, source, phase, verdict and a nonempty reason.

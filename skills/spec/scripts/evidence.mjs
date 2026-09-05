@@ -14,7 +14,7 @@ export const specFiles = (type) => ["requirements.md", "tasks.md", ".spec-state.
 /** Run Git in a checkout with an optional environment and return stdout without trailing whitespace.
  * Throw on failure; NUL-delimited filename output retains its terminal NUL. */
 export function git(repo, args, env) {
-  const result = spawnSync("git", args, { cwd: repo, env, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
+  const result = spawnSync("git", args, { cwd: repo, env, encoding: "utf8", timeout: 120000, killSignal: "SIGKILL", maxBuffer: 32 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
   return result.stdout.trimEnd();
 }

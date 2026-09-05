@@ -35,7 +35,7 @@ function assertHead(repo, head, branch) {
 
 /** Run a GitHub CLI operation with optional stdin in the checkout and throw on failure. */
 function gh(repo, args, input) {
-  const result = spawnSync("gh", args, { cwd: repo, input, encoding: "utf8", timeout: 120000 });
+  const result = spawnSync("gh", args, { cwd: repo, input, encoding: "utf8", timeout: 120000, killSignal: "SIGKILL" });
   if (result.status !== 0) throw new Error(`gh ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
   return result.stdout.trim();
 }

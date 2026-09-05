@@ -15,9 +15,13 @@ function writePrompt(prompt) {
   return file;
 }
 
+/** Apply the caller's deadline with a signal the runner cannot catch or ignore. */
 function spawnOpts(opts, extra = {}) {
   const out = { cwd: process.cwd(), ...extra };
-  if (opts.timeoutMs > 0) out.timeout = opts.timeoutMs;
+  if (opts.timeoutMs > 0) {
+    out.timeout = opts.timeoutMs;
+    out.killSignal = "SIGKILL";
+  }
   return out;
 }
 

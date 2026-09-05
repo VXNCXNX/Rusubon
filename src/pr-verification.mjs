@@ -13,7 +13,7 @@ import { redact } from "./doctor.mjs";
 export function validateSpec(repo, specDir, receiptPath) {
   const args = [join(skillsDir(), "spec/scripts/check-spec.mjs"), specDir];
   if (receiptPath) args.push("--complete", "--receipt", receiptPath);
-  const result = spawnSync(process.execPath, args, { cwd: repo, encoding: "utf8", timeout: 30000 });
+  const result = spawnSync(process.execPath, args, { cwd: repo, encoding: "utf8", timeout: 30000, killSignal: "SIGKILL" });
   if (result.status !== 0) throw new Error(`spec validation failed: ${result.stdout || ""}${result.stderr || result.error?.message || ""}`);
   const { tasks } = parseTasks(readFileSync(join(specDir, "tasks.md"), "utf8"));
   assertPublishableTaskPaths(repo, tasks.flatMap((task) => task.files));
@@ -54,8 +54,9 @@ export function passingTap(output) {
 }
 
 /** Run every declared verification command against unchanged spec and code contents.
+ * Each command defaults to a two-minute budget and is force-killed on timeout.
  * Save redacted logs and a matching receipt, then validate completed implementation evidence. */
-export function verifyImplementation({ repo, specDir, runDir, runId, source }) {
+export function verifyImplementation({ repo, specDir, runDir, runId, source, timeoutMs = 120000 }) {
   validateSpec(repo, specDir);
   const state = JSON.parse(readFileSync(join(specDir, ".spec-state.json"), "utf8"));
   if (state.closure !== "implemented") throw new Error("implementation did not complete the spec");
@@ -69,8 +70,8 @@ export function verifyImplementation({ repo, specDir, runDir, runId, source }) {
     // A nested Node test runner otherwise emits its parent's binary IPC format.
     delete env.NODE_TEST_CONTEXT;
     const result = spawnSync(bin, args, {
-      cwd: working, encoding: "utf8", timeout: 120000, maxBuffer: 16 * 1024 * 1024,
-      env,
+      cwd: working, encoding: "utf8", timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024,
+      env, killSignal: "SIGKILL",
     });
     const output = redact(`${result.stdout || ""}${result.stderr || ""}`);
     const log = join(runDir, `${command.id}.log`);
