@@ -1231,6 +1231,15 @@ dialog::backdrop {
 .scope-run-note { border-left: 2px solid var(--line); padding-left: 12px; margin-bottom: 12px; white-space: pre-wrap; font-size: 13px; }
 .job-overview { display: grid; gap: 20px; align-items: start; }
 .job-overview .run-scope { margin-bottom: 0; }
+.scout-outcome { margin-bottom: 24px; }
+.scout-outcome .eyebrow { margin-bottom: 8px; }
+.scout-outcome h2 { font-size: 22px; text-wrap: balance; }
+.scout-outcome p { max-width: 76ch; margin: 10px 0; color: var(--muted); text-wrap: pretty; }
+.outcome-counts { font-variant-numeric: tabular-nums; }
+.scout-outcome .outcome-limit { padding-left: 12px; border-left: 2px solid var(--line); margin: 18px 0; font-size: 12px; }
+.outcome-limit strong { color: var(--ink); }
+.scout-outcome .actions { margin-top: 18px; }
+.history-outcome { display: block; color: var(--ink); font-size: 12px; margin-top: 6px; }
 @media (min-width: 1100px) {
   .scope-investigation { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 28px; }
   .scope-checks { margin-top: 0; }

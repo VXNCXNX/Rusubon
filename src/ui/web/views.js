@@ -25,7 +25,36 @@ export function readiness(state, selection) {
   if (!model?.available || !model.efforts.includes(selection.effort)) return { ready: false, text: "Model unavailable", detail: "Choose a model and effort supported by this connection." };
   if (!connection.mcp?.some(row => row.connected)) return { ready: false, text: "Connect PostHog", detail: "Authorize the official PostHog MCP for this runner in Setup." };
   if (selection.runner === "claude" && !connection.models.some(row => row.id === w.config.read.model && row.available && row.efforts.includes("low"))) return { ready: false, text: "Review model unavailable", detail: "Choose an available Claude session-review model in Setup." };
-  return { ready: true, text: "Ready to scout", detail: selection.runner === "claude" ? `SQL analysis, then qualified session review with ${modelLabel(w.config.read.model)} · low.` : "SQL analysis. Findings stay in your inbox for review." };
+  return { ready: true, text: "Ready to scout", detail: selection.runner === "claude" ? `SQL analysis, then qualified session review with ${modelLabel(w.config.read.model)} · low.` : "SQL analysis only. Choose Claude Code to also review qualified sessions and investigate P2 friction." };
+}
+
+function scoutOutcome(job) {
+  if (job.kind !== "scout" || !["completed", "needs_attention"].includes(job.status) || !Array.isArray(job.result?.reports)) return null;
+  const result = job.result, count = result.reports.length;
+  const incomplete = job.status === "needs_attention" || result.mcp === "missing" || result.timedOut;
+  const title = incomplete ? "Investigation incomplete" : count ? `${count} finding${count === 1 ? "" : "s"} filed` : "No findings filed";
+  const description = result.mcp === "missing" ? "PostHog tools were unavailable. This run could not establish whether anything needs attention."
+    : result.timedOut ? "The run reached its time limit. Review the close-out for partial results and remaining work."
+    : incomplete ? "Review the close-out for the evidence limits and remaining work."
+    : count ? "Review the evidence in your inbox and decide what deserves a fix."
+    : "This run completed without creating or updating a report. The close-out explains what was checked, the evidence limits, and why nothing was filed.";
+  const newCount = result.reports.filter(row => row.kind === "new").length;
+  const updatedCount = result.reports.filter(row => row.kind === "updated").length;
+  const memoryCount = result.memory?.length || 0;
+  return { title, description, count, details: `${newCount} new · ${updatedCount} updated · ${memoryCount} memory update${memoryCount === 1 ? "" : "s"}` };
+}
+
+function scoutOutcomeView(job) {
+  const outcome = scoutOutcome(job);
+  if (!outcome) return "";
+  const closeOut = job.artifacts?.find(row => row.key.endsWith("/close-out.md"));
+  return `<section class="panel scout-outcome" data-key="scout-outcome" aria-labelledby="scout-outcome-title">
+    <div class="eyebrow">Run outcome</div><h2 id="scout-outcome-title">${escape(outcome.title)}</h2>
+    <p>${escape(outcome.description)}</p>
+    <div class="caption outcome-counts">${escape(outcome.details)}</div>
+    ${job.selection?.runner === "codex" ? `<p class="outcome-limit"><strong>SQL analysis only.</strong> Codex does not review individual sessions or file P2 friction findings. Choose Claude Code for a scout that can also review qualified sessions.</p>` : ""}
+    ${closeOut || outcome.count ? `<div class="actions">${closeOut ? `<button class="button" type="button" data-artifact="${escape(closeOut.key)}">Read results &amp; explanation ${icon("arrow")}</button>` : ""}${outcome.count ? `<button class="button" type="button" data-page="findings" data-filter="open">View findings</button>` : ""}</div>` : ""}
+  </section>`;
 }
 
 export function modelControls(state, selection, role = "scout") {
@@ -41,7 +70,10 @@ export function modelControls(state, selection, role = "scout") {
 
 export function runList(jobs) {
   if (!jobs.length) return `<div class="empty"><h3>Your first run starts here.</h3><p>Once setup is ready, launch a scout. Its progress, decisions, and evidence will appear here.</p></div>`;
-  return jobs.map(job => `<button type="button" class="history" data-key="${escape(job.id)}" data-job="${escape(job.id)}"><div><strong>${escape(labels[job.kind] || job.kind)}${job.source ? ` <span class="muted">/ ${escape(job.source.value)}</span>` : ""}</strong><p>${escape(date(job.startedAt))} · <span data-duration="${escape(job.id)}">${escape(duration(job))}</span>${job.specSelection ? ` · Spec: ${escape(modelLabel(job.specSelection.model))} · ${escape(job.specSelection.effort)}` : ""}${job.selection ? ` · ${job.specSelection ? "Build: " : ""}${escape(modelLabel(job.selection.model))} · ${escape(job.selection.effort)}` : ""}</p></div>${badge(job)}</button>`).join("");
+  return jobs.map(job => {
+    const outcome = scoutOutcome(job);
+    return `<button type="button" class="history" data-key="${escape(job.id)}" data-job="${escape(job.id)}"><div><strong>${escape(labels[job.kind] || job.kind)}${job.source ? ` <span class="muted">/ ${escape(job.source.value)}</span>` : ""}</strong><p>${escape(date(job.startedAt))} · <span data-duration="${escape(job.id)}">${escape(duration(job))}</span>${job.specSelection ? ` · Spec: ${escape(modelLabel(job.specSelection.model))} · ${escape(job.specSelection.effort)}` : ""}${job.selection ? ` · ${job.specSelection ? "Build: " : ""}${escape(modelLabel(job.selection.model))} · ${escape(job.selection.effort)}` : ""}</p>${outcome ? `<span class="history-outcome">${escape(outcome.title)}</span>` : ""}</div>${badge(job)}</button>`;
+  }).join("");
 }
 
 export function findingList(rows, archived) {
@@ -67,7 +99,7 @@ export function jobView(job) {
   const phases = new Map(); for (const event of job.events) if (event.type === "phase") phases.set(event.name, event);
   const selection = job.selection;
   const progress = phases.size ? `<div class="panel" data-key="phases"><h2>Run progress</h2><ol class="timeline">${[...phases.values()].map(phase => `<li class="${escape(phase.status)}" data-key="${escape(phase.name)}"><span class="step-dot">${stateIcon(phase.status === "completed")}</span><span>${escape(phase.name)}</span><span class="caption">${escape(phase.status === "running" && ended(job) ? "Incomplete" : statuses[phase.status] || phase.status)}</span></li>`).join("")}</ol></div>` : !ended(job) ? `<p class="caption">${job.status === "starting" ? "Starting the local runner…" : "Your agent is working. Activity appears below as it arrives."}</p>` : "";
-  return `<button type="button" class="text-button back" data-key="back" data-page="runs">← All runs</button><div class="heading" data-key="job-heading"><div><div class="eyebrow">${escape(date(job.startedAt))}</div><h1 id="job-title">${escape(labels[job.kind] || job.kind)}</h1><div class="job-meta">${selection ? `<span>${job.specSelection ? "Implementation: " : ""}${selection.runner === "claude" ? "Claude Code" : "Codex"} · ${escape(modelLabel(selection.model))} · ${escape(selection.effort)}</span>` : ""}${job.specSelection ? `<span>Spec: ${escape(modelLabel(job.specSelection.model))} · ${escape(job.specSelection.effort)}</span>` : ""}${selection ? `<span>${permissionLabel(job.permissionMode === undefined ? "ask" : job.permissionMode)} permissions</span>` : ""}<span data-job-duration data-duration="${escape(job.id)}">${escape(duration(job))}</span>${job.source ? `<span>${escape(job.source.value)}</span>` : ""}</div></div><div class="actions">${badge(job)}${!ended(job) ? `<button class="button" type="button" data-stop="${escape(job.id)}" ${job.status === "stopping" ? "disabled" : ""}>Stop run</button>` : ["scout", "pr"].includes(job.kind) ? `<button class="button" type="button" data-rerun>${job.scoutScope ? "Review & rerun" : "Run again"}</button>` : `<button class="button" type="button" data-page="setup">Back to setup</button>`}</div></div>${job.error ? `<div class="notice error" data-key="job-error">${escape(job.error)}</div>` : ""}${job.result?.url ? `<p class="notice" data-key="job-result"><a href="${escape(safeUrl(job.result.url))}" target="_blank" rel="noopener noreferrer">Open draft PR for review ↗</a></p>` : ""}${job.result?.worktree || job.worktree ? `<div class="repo-strip" data-key="worktree"><span class="caption">Worktree</span><code>${escape(job.result?.worktree || job.worktree)}</code></div>` : ""}${job.scoutScope ? `<div class="job-overview" data-key="overview">${scopeView(job.scoutScope)}${progress}</div>` : progress}`;
+  return `<button type="button" class="text-button back" data-key="back" data-page="runs">← All runs</button><div class="heading" data-key="job-heading"><div><div class="eyebrow">${escape(date(job.startedAt))}</div><h1 id="job-title">${escape(labels[job.kind] || job.kind)}</h1><div class="job-meta">${selection ? `<span>${job.specSelection ? "Implementation: " : ""}${selection.runner === "claude" ? "Claude Code" : "Codex"} · ${escape(modelLabel(selection.model))} · ${escape(selection.effort)}</span>` : ""}${job.specSelection ? `<span>Spec: ${escape(modelLabel(job.specSelection.model))} · ${escape(job.specSelection.effort)}</span>` : ""}${selection ? `<span>${permissionLabel(job.permissionMode === undefined ? "ask" : job.permissionMode)} permissions</span>` : ""}<span data-job-duration data-duration="${escape(job.id)}">${escape(duration(job))}</span>${job.source ? `<span>${escape(job.source.value)}</span>` : ""}</div></div><div class="actions">${badge(job)}${!ended(job) ? `<button class="button" type="button" data-stop="${escape(job.id)}" ${job.status === "stopping" ? "disabled" : ""}>Stop run</button>` : ["scout", "pr"].includes(job.kind) ? `<button class="button" type="button" data-rerun>${job.scoutScope ? "Review & rerun" : "Run again"}</button>` : `<button class="button" type="button" data-page="setup">Back to setup</button>`}</div></div>${job.error ? `<div class="notice error" data-key="job-error">${escape(job.error)}</div>` : ""}${job.result?.url ? `<p class="notice" data-key="job-result"><a href="${escape(safeUrl(job.result.url))}" target="_blank" rel="noopener noreferrer">Open draft PR for review ↗</a></p>` : ""}${job.result?.worktree || job.worktree ? `<div class="repo-strip" data-key="worktree"><span class="caption">Worktree</span><code>${escape(job.result?.worktree || job.worktree)}</code></div>` : ""}${scoutOutcomeView(job)}${job.scoutScope ? `<div class="job-overview" data-key="overview">${scopeView(job.scoutScope)}${progress}</div>` : progress}`;
 }
 
 export function scopeView(scope) {
