@@ -626,6 +626,30 @@ code {
   gap: 20px;
   margin: 24px 0;
 }
+.permission-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 24px;
+  align-items: center;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.permission-settings label {
+  width: 180px;
+  max-width: 100%;
+}
+.permission-settings .caption {
+  margin: 4px 0 0;
+}
+.permission-note {
+  grid-column: 1 / -1;
+}
+@media (max-width: 600px) {
+  .permission-settings {
+    grid-template-columns: 1fr;
+  }
+}
 .full {
   grid-column: 1/-1;
 }

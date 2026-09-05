@@ -169,6 +169,27 @@ scout. The `spec` and `implementation` objects each accept their own `runner`,
 `model`, and `effort`. The CLI PR workflow honors both objects. Existing CLI
 configurations without these objects keep using the top-level selection.
 
+### Agent permissions
+
+Permissions default to **Auto** for Claude Code and Codex, including CLI
+runs and existing configs without a permission setting. Change the mode in
+**Setup → Agent permissions**, or set `"permissionMode": "auto"` at the top level
+of `rusubon.json`.
+
+| Mode | Behavior |
+| --- | --- |
+| Auto (default) | The runner reviews tool actions automatically. Routine permissions need no clicks; some actions can still be blocked or require input. Codex keeps its workspace sandbox. |
+| Ask | Review permission requests in the dashboard. Headless CLI runs can deny actions that require approval. |
+| YOLO | Bypasses tool permission checks. Codex also runs with full filesystem and network access. |
+
+Auto uses Claude Code's `auto` permission mode and Codex's `--approve-for-me`
+CLI flag or `auto_review` dashboard reviewer. YOLO uses Claude's
+`bypassPermissions` and Codex's approval/sandbox
+bypass. Use current runner versions that support these modes. Product questions
+and sign-in still need you. Saving applies to future runs, including reruns;
+each dashboard run records its mode at launch. This setting covers scouts,
+context drafts, and both research phases. Cursor keeps its existing CLI behavior.
+
 Follow phases, agent messages, tool activity, usage, and saved artifacts from a
 run's page. Answer permission prompts and agent questions there. Refreshing or
 closing the browser does not stop the run. Stop run, or Ctrl-C in the dashboard

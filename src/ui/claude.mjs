@@ -2,6 +2,7 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { pkgRoot } from "../config.mjs";
 import { availableModels, canonicalClaudeModel, SPEC_MODEL_ALLOWLIST } from "./models.mjs";
 import { command, inputQueue, safeText } from "./process.mjs";
+import { claudePermissions } from "../permissions.mjs";
 
 export function claudeOptions(cwd, extra = {}) {
   return {
@@ -46,7 +47,8 @@ export function assertClaudeSelection(message, { model, effort }) {
   if (init && message.effort !== undefined && message.effort !== effort) throw new Error(`Claude selected ${safeText(message.effort)} effort instead of ${effort}. Run stopped.`);
 }
 
-export async function runClaude(prompt, { cwd, model, effort, signal, emit, ask, timeoutMs = 30 * 60_000, createQuery = query }) {
+export async function runClaude(prompt, { cwd, model, effort, permissionMode, signal, emit, ask, timeoutMs = 30 * 60_000, createQuery = query }) {
+  const permissions = claudePermissions(permissionMode);
   const controller = new AbortController();
   let timedOut = false;
   const abort = () => controller.abort(); signal?.addEventListener("abort", abort, { once: true });
@@ -70,7 +72,7 @@ export async function runClaude(prompt, { cwd, model, effort, signal, emit, ask,
   try {
     if (signal?.aborted) throw new Error("Run stopped");
     session = createQuery({ prompt, options: claudeOptions(cwd, {
-      model, effort, abortController: controller, additionalDirectories: [pkgRoot()],
+      model, effort, ...permissions, abortController: controller, additionalDirectories: [pkgRoot()],
       settings: { availableModels: [model], fallbackModel: [] },
       env: { ...process.env, CLAUDE_CODE_EFFORT_LEVEL: effort },
       hooks: Object.fromEntries(["PreToolUse", "Stop", "PreModelSwitch", "PostModelSwitch"].map(event => [event, [{ hooks: [checkRuntime] }]])),
@@ -91,6 +93,7 @@ export async function runClaude(prompt, { cwd, model, effort, signal, emit, ask,
       if (selectionError) throw selectionError;
       assertClaudeSelection(message, { model, effort });
       if (message.type === "system" && message.subtype === "init") {
+        if (message.permissionMode !== undefined && message.permissionMode !== permissions.permissionMode) throw new Error("Claude did not apply the requested permission mode. Update Claude Code or review its managed settings before retrying.");
         modelObserved ||= Boolean(message.model);
         if (message.effort !== undefined) observeEffort(message.effort);
         emit({ type: "session", runner: "claude", sessionId: message.session_id, model, effort, effortVerified: message.effort === effort });

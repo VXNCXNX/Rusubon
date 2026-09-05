@@ -91,7 +91,7 @@ export async function draftContext(opts = {}) {
   mkdirSync(rusubonDir(), { recursive: true });
   const prompt = buildDraftPrompt(config, about);
   let result;
-  try { result = await (opts.run || runWith)(config.runner, prompt, { model: config.model || undefined, effort: "low" }); }
+  try { result = await (opts.run || runWith)(config.runner, prompt, { model: config.model || undefined, effort: "low", permissionMode: config.permissionMode }); }
   finally { if (existsSync(path)) writeFileSync(path, sealDraft(readFileSync(path, "utf8"))); }
   if (result.status !== 0) {
     throw new Error(`${config.runner} exited ${result.status} (context draft)`);

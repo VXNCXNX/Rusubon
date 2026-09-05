@@ -169,7 +169,7 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     onEvent({ type: "phase", name, status: "running" });
     let result, parsed, resultError;
     try {
-      result = await run(phaseConfig.runner, prompt, { phase: name, model: phaseConfig.model || undefined, effort: phaseConfig.effort || undefined, timeoutMs: 30 * 60 * 1000 });
+      result = await run(phaseConfig.runner, prompt, { phase: name, model: phaseConfig.model || undefined, effort: phaseConfig.effort || undefined, permissionMode: config.permissionMode, timeoutMs: 30 * 60 * 1000 });
     } finally {
       // Failed or interrupted runners may still have written sensitive artifacts.
       try { parsed = readResult(join(runDir, `${name}.json`), runId, label, name); }

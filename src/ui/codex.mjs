@@ -2,6 +2,7 @@ import { CodexRpc } from "./codex-rpc.mjs";
 import { availableModels } from "./models.mjs";
 import { command, safeText } from "./process.mjs";
 import { isOfficialPosthog } from "./claude.mjs";
+import { codexPermissions } from "../permissions.mjs";
 
 export async function inspectCodex(cwd) {
   const rpc = new CodexRpc({ cwd });
@@ -30,7 +31,10 @@ export async function answerCodexRequest(message, ask, signal) {
     return { decision: response.allow ? "accept" : "decline" };
   }
   if (method === "mcpServer/elicitation/request") {
-    const response = await ask({ kind: "elicitation", title: params.message || "Connection needs input", input: params }, signal);
+    const toolApproval = params._meta?.codex_approval_kind === "mcp_tool_call";
+    const response = await ask(toolApproval
+      ? { kind: "permission", title: params.message || "Allow MCP tool", input: { server: params.serverName, tool: params._meta.tool_title, arguments: params._meta.tool_params } }
+      : { kind: "elicitation", title: params.message || "Connection needs input", input: params }, signal);
     return { action: response.allow ? "accept" : "decline", content: response.allow ? response.content || {} : null };
   }
   if (method === "item/permissions/requestApproval") {
@@ -40,8 +44,9 @@ export async function answerCodexRequest(message, ask, signal) {
   throw new Error(`Unsupported Codex request: ${method}. Update Rusubon before continuing.`);
 }
 
-export async function runCodex(prompt, { cwd, model, effort, signal, emit, ask, timeoutMs = 30 * 60_000 }) {
-  const rpc = new CodexRpc({ cwd });
+export async function runCodex(prompt, { cwd, model, effort, permissionMode, signal, emit, ask, timeoutMs = 30 * 60_000, createRpc = options => new CodexRpc(options) }) {
+  const permissions = codexPermissions(permissionMode);
+  const rpc = createRpc({ cwd });
   let timer, threadId, timedOut = false;
   let finish, fail;
   const completed = new Promise((resolve, reject) => { finish = resolve; fail = reject; });
@@ -72,8 +77,9 @@ export async function runCodex(prompt, { cwd, model, effort, signal, emit, ask, 
     if (signal?.aborted) throw new Error("Run stopped");
     timer = setTimeout(() => { timedOut = true; abort(); }, timeoutMs);
     await rpc.initialize();
-    const thread = await rpc.request("thread/start", { cwd, model, approvalPolicy: "on-request", sandbox: "workspace-write", config: { model_reasoning_effort: effort }, serviceName: "rusubon" });
+    const thread = await rpc.request("thread/start", { cwd, model, ...permissions, config: { model_reasoning_effort: effort }, serviceName: "rusubon" });
     threadId = thread.thread.id;
+    if (thread.approvalPolicy !== permissions.approvalPolicy || thread.approvalsReviewer !== permissions.approvalsReviewer || thread.sandbox?.type !== (permissions.sandbox === "danger-full-access" ? "dangerFullAccess" : "workspaceWrite")) throw new Error("Codex did not apply the requested permission mode. Update Codex or review its managed settings before retrying.");
     if (thread.model && thread.model !== model) throw new Error("Codex changed the requested model");
     if (thread.reasoningEffort && thread.reasoningEffort !== effort) throw new Error(`Codex selected ${thread.reasoningEffort} effort instead of ${effort}`);
     emit({ type: "session", runner: "codex", sessionId: threadId, model, effort });

@@ -66,7 +66,7 @@ async function runJob(input) {
     }
     return { message: "PostHog configured in your runner. Refresh the connection." };
   }
-  const config = loadConfig();
+  const config = { ...loadConfig(), permissionMode: input.permissionMode };
   if (input.kind === "scout" && input.scoutScope?.revision) assertSetupRevision(repo, input.scoutScope.revision);
   const requested = input.kind === "pr" ? { spec: input.specSelection, implementation: input.selection } : { scout: input.selection };
   const connections = new Map(await Promise.all([...new Set(Object.values(requested).map(choice => choice.runner))].map(async runner => [runner, await inspect(runner, repo)])));
@@ -91,7 +91,7 @@ async function runJob(input) {
     const chosen = validateSelection({ runner, model: options.model || expected.model, effort: options.effort || expected.effort }, connections.get(runner).models, role);
     emit({ type: "model", ...chosen, role, phase: options.phase || input.kind });
     const adapter = chosen.runner === "claude" ? runClaude : runCodex;
-    return adapter(prompt, { ...chosen, cwd: process.cwd(), signal: controller.signal, emit, ask, timeoutMs: options.timeoutMs });
+    return adapter(prompt, { ...chosen, permissionMode: config.permissionMode, cwd: process.cwd(), signal: controller.signal, emit, ask, timeoutMs: options.timeoutMs });
   };
   if (input.kind === "scout") {
     if (!official.length) {

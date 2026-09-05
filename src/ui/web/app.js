@@ -1,4 +1,4 @@
-import { escape, ended, labels, duration, modelLabel, modelControls, readiness, runList, findingList, reportView, prModelSummary, connectionViews, jobView, activityView } from "/views.js";
+import { escape, ended, labels, duration, modelLabel, permissionLabel, modelControls, readiness, runList, findingList, reportView, prModelSummary, connectionViews, jobView, activityView } from "/views.js";
 import { syncRequests } from "/requests.js";
 import { createRefreshScheduler } from "/refresh.js";
 import { updateMarkup, enterPage } from "/interface.js";
@@ -50,8 +50,17 @@ function fillSetup() {
   $("product-context").value = context || "# Product\n\n\n# Money paths\n\n\n# Intentional friction\n\n\n# Out of scope\n\n";
   $("context-confirmed").checked = confirmed;
   $("read-model").value = config.read.model;
+  $("permission-mode").value = config.permissionMode;
+  permissionHelp();
   setupRevision = state.workspace.revision;
   setupFilled = true;
+}
+function permissionHelp() {
+  $("permission-help").textContent = {
+    auto: "The runner reviews tool actions automatically. Routine permissions need no clicks; some actions may still be blocked or require input.",
+    ask: "Review tool permission requests in the dashboard. Headless CLI runs can deny actions that require approval.",
+    yolo: "Skips tool permission checks. Codex also runs with full filesystem and network access.",
+  }[$("permission-mode").value] || "Choose a permission mode to repair the saved setting.";
 }
 function renderState() {
   const w = state.workspace;
@@ -70,7 +79,7 @@ function renderState() {
   $("scope-error").textContent = investigation.error; $("scope-error").hidden = !investigation.error;
   $("launch-summary").textContent = investigation.scope ? `${investigation.scope.options.checks.length} checks · ${investigation.scope.paths.length} ${investigation.scope.paths.length === 1 ? "path" : "paths"} · ${windowLabel(investigation.scope.window)}` : "";
   $("launch-scout").disabled = !ready.ready || !investigation.scope || submitting;
-  $("model-help").textContent = selection.effort === "ultra" ? "ultra enables automatic delegation in the connected Codex runner. The choice is saved with this run." : "Model and effort are checked against your connected runner before each phase.";
+  $("model-help").textContent = `${permissionLabel(w.config.permissionMode)} permissions · ${selection.effort === "ultra" ? "ultra enables automatic delegation in the connected Codex runner." : "Model and effort are checked against your connected runner before each phase."}`;
   updateMarkup($("run-list"), runList(state.jobs));
   updateMarkup($("finding-list"), findingList(filter === "open" ? state.reports : state.archived, filter === "archived"));
   updateMarkup($("connections"), connectionViews(state));
@@ -185,10 +194,11 @@ for (const role of ["scout", "spec", "implementation"]) $(role === "scout" ? "mo
 $("launch-scout").addEventListener("click", protect(() => start({ kind: "scout", selection, scout: scoutControls.value(), expectedRevision: state.workspace.revision })));
 $("refresh-connections").addEventListener("click", protect(async () => { await Promise.all(["claude", "codex"].map(runner => api("/connections/refresh", { runner }))); await refresh(); }));
 $("setup-form").addEventListener("input", () => { dirtySetup = true; $("draft-context").disabled = true; });
+$("permission-mode").addEventListener("change", () => { dirtySetup = true; permissionHelp(); });
 $("setup-form").addEventListener("submit", protect(async event => {
   event.preventDefault(); const form = event.target;
   if (!form.reportValidity()) return;
-  await start({ kind: "setup", setup: { ...selection, scout: scoutControls.value(), spec: specSelection, implementation: implementationSelection, expectedRevision: setupRevision, projectId: form.elements.projectId.value, host: form.elements.host.value, context: form.elements.context.value, confirmed: form.elements.confirmed.checked, readModel: form.elements.readModel.value } });
+  await start({ kind: "setup", setup: { ...selection, permissionMode: form.elements.permissionMode.value, scout: scoutControls.value(), spec: specSelection, implementation: implementationSelection, expectedRevision: setupRevision, projectId: form.elements.projectId.value, host: form.elements.host.value, context: form.elements.context.value, confirmed: form.elements.confirmed.checked, readModel: form.elements.readModel.value } });
 }));
 $("view-current-setup").addEventListener("click", protect(async () => {
   await refresh();

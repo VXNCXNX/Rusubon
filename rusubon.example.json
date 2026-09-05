@@ -4,6 +4,7 @@
     "host": "YOUR_REGION"
   },
   "runner": "claude",
+  "permissionMode": "auto",
   "read": {
     "effort": "low"
   }

@@ -141,7 +141,7 @@ export async function runSkill(name, config, probes, { run = runWith, runId, onE
   const prompt1 = buildPrompt(skill, config, { phase: 1, files, scope });
   writeFileSync(resolve(promptDir, "last-prompt.md"), prompt1);
   onEvent({ type: "phase", name: "SQL analysis", status: "running" });
-  const result1 = await run(config.runner, prompt1, { phase: 1, model: config.model || undefined, effort: config.effort || undefined });
+  const result1 = await run(config.runner, prompt1, { phase: 1, model: config.model || undefined, effort: config.effort || undefined, permissionMode: config.permissionMode });
   if (result1.status !== 0) {
     throw new Error(`${config.runner} exited ${result1.status} (phase 1)`);
   }
@@ -162,6 +162,7 @@ export async function runSkill(name, config, probes, { run = runWith, runId, onE
       phase: 2,
       model: read.model || undefined,
       effort: read.effort || "low",
+      permissionMode: config.permissionMode,
       timeoutMs: READ_MAX_MS,
     });
     timedOut = result2.timedOut;

@@ -9,6 +9,7 @@ import { missingSections, sealDraft } from "../context-draft.mjs";
 import { safeText, safeValue } from "./process.mjs";
 import { DEFAULT_SPEC_SELECTION, validateSavedSelection } from "./models.mjs";
 import { DEFAULT_SCOUT, moneyPaths, scoutOptions, scoutWindow } from "../scout-scope.mjs";
+import { resolvePermissionMode } from "../permissions.mjs";
 
 export function localPath(repo, path) {
   if (typeof path !== "string" || isAbsolute(path) || path.includes("\0")) throw new Error("Invalid workspace path");
@@ -70,6 +71,8 @@ export function workspaceState(repo) {
   config.spec = raw.spec || { ...DEFAULT_SPEC_SELECTION };
   config.implementation = raw.implementation || { runner: config.runner, model: config.model, effort: config.effort };
   config.scout = raw.scout || DEFAULT_SCOUT;
+  // Keep an invalid saved value visible so Setup can repair it. Launch validates it.
+  config.permissionMode = raw.permissionMode === undefined ? "auto" : raw.permissionMode;
   return { repo, name: repo.split(sep).pop(), initialized: snapshot.config !== null, config, context, moneyPaths: moneyPaths(context), revision: snapshot.revision, confirmed: !snapshot.pending && Boolean(context) && !context.includes(PLACEHOLDER), error };
 }
 
@@ -86,13 +89,14 @@ export function saveSetup(repo, input) {
   if (input.confirmed && (missingSections(body).length || !body.includes("# Money paths\n"))) throw new Error("Include Product, Money paths, Intentional friction, and Out of scope headings before confirming");
   const context = input.confirmed ? `${body}\n` : sealDraft(body);
   let existing = {}; try { existing = JSON.parse(snapshot.config || "{}"); } catch { throw new Error("Fix invalid rusubon.json before saving setup"); }
+  const permissionMode = resolvePermissionMode(input.permissionMode === undefined ? existing.permissionMode : input.permissionMode);
   const read = validateSavedSelection({ runner: "claude", model: input.readModel || "claude-sonnet-5", effort: "low" });
   const spec = validateSavedSelection(input.spec || existing.spec || DEFAULT_SPEC_SELECTION, "spec");
   const implementation = validateSavedSelection(input.implementation || existing.implementation || selection, "implementation");
   const scout = input.scout || existing.scout ? scoutOptions(input.scout || existing.scout) : undefined;
   if (scout) scoutWindow(scout);
   if (scout && safeText(scout.note) !== scout.note) throw new Error("Remove credentials from additional context before saving.");
-  writeLocal(repo, "rusubon.json", JSON.stringify({ ...existing, ...selection, spec, implementation, ...(scout ? { scout } : {}), posthog: { projectId: id, host: input.host }, read: { model: read.model, effort: "low" } }, null, 2) + "\n");
+  writeLocal(repo, "rusubon.json", JSON.stringify({ ...existing, ...selection, permissionMode, spec, implementation, ...(scout ? { scout } : {}), posthog: { projectId: id, host: input.host }, read: { model: read.model, effort: "low" } }, null, 2) + "\n");
   writeLocal(repo, ".rusubon/context.md", context);
   return workspaceState(repo);
 }
