@@ -78,7 +78,7 @@ function renderState() {
   const ready = readiness(state, selection);
   const investigation = scoutControls.update(w, selection.runner, busy());
   $("readiness").textContent = ready.ready && investigation.error ? "Review scope" : ready.text;
-  $("launch-help").textContent = ready.ready ? "Saved with this run. Findings stay in your inbox for review." : ready.detail;
+  $("launch-help").textContent = ready.detail;
   $("scope-error").textContent = investigation.error; $("scope-error").hidden = !investigation.error;
   $("launch-summary").textContent = investigation.scope ? `${investigation.scope.options.checks.length} checks · ${investigation.scope.paths.length} ${investigation.scope.paths.length === 1 ? "path" : "paths"} · ${windowLabel(investigation.scope.window)}` : "";
   $("launch-scout").disabled = !ready.ready || !investigation.scope || submitting;
@@ -99,11 +99,7 @@ function renderState() {
 }
 function renderJob() {
   if (!currentJob) return;
-  let header = jobView(currentJob);
-  if (currentJob.kind === "scout" && ended(currentJob) && currentJob.result?.reports) {
-    header += `<div class="notice" data-key="result-summary">${escape(`${currentJob.result.reports.length} findings written · ${currentJob.result.memory?.length || 0} memory updates${currentJob.result.closeLine ? `. ${currentJob.result.closeLine}` : ""}`)}</div>`;
-  }
-  updateMarkup($("job-detail"), header);
+  updateMarkup($("job-detail"), jobView(currentJob));
   updateMarkup($("job-activity"), activityView(currentJob));
   syncRequests($("requests"), currentJob.requests, async (requestId, response) => { await api(`/jobs/${currentJob.id}/answer`, { requestId, response }); await refresh(); });
   updateMarkup($("job-artifacts"), currentJob.artifacts?.length ? `<div class="section-title"><h2>Files from this run</h2><span class="caption">Available even after a stopped run</span></div><div class="artifact-links">${currentJob.artifacts.map(row => `<button type="button" class="button" data-key="${escape(row.key)}" data-artifact="${escape(row.key)}">${escape(row.label)}</button>`).join("")}</div>` : "");
