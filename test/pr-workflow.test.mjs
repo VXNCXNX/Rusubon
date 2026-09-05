@@ -156,6 +156,22 @@ test("ignored task declarations fail before implementation", async () => {
   assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
 });
 
+test("Git-administrative task paths fail before implementation", async () => {
+  for (const name of [".git", ".git/config", ".git/hooks/pre-commit", "nested/.git/config", ".GIT/config"]) {
+    const f = setup();
+    await assert.rejects(f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 1) {
+        const path = join(f.latest.specDir, "tasks.md");
+        writeFileSync(path, readFileSync(path, "utf8").replace("Files:", `Files: \`${name}\`,`));
+      }
+      return { status: 0 };
+    }), /Git-administrative task path/);
+    assert.deepEqual(f.calls, ["research"]);
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
 test("implementation cannot make declared files invisible before verification", async () => {
   for (const ignoreFile of [".gitignore", ".git/info/exclude"]) {
     const f = setup();

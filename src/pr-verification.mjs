@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { Parser } from "tap-parser";
 import { assertReceipt, hash, localPath, planHash, snapshot } from "../skills/spec/scripts/evidence.mjs";
 import { parseTasks } from "../skills/spec/scripts/tasks.mjs";
+import { assertPublishableTaskPaths } from "./pr-task-paths.mjs";
 import { skillsDir } from "./run.mjs";
 import { redact } from "./doctor.mjs";
 
@@ -13,17 +14,7 @@ export function validateSpec(repo, specDir, receiptPath) {
   const result = spawnSync(process.execPath, args, { cwd: repo, encoding: "utf8", timeout: 30000 });
   if (result.status !== 0) throw new Error(`spec validation failed: ${result.stdout || ""}${result.stderr || result.error?.message || ""}`);
   const { tasks } = parseTasks(readFileSync(join(specDir, "tasks.md"), "utf8"));
-  const paths = [...new Set(tasks.flatMap((task) => task.files.map((path) => relative(repo, localPath(repo, path)))))];
-  if (paths.some((path) => path === ".rusubon/runs" || path.startsWith(".rusubon/runs/"))) {
-    throw new Error("task files cannot use the harness run-artifact directory");
-  }
-  // Tracked files remain eligible even when an ignore rule also matches them.
-  // Recheck on every validation so implementation cannot introduce new exclusions.
-  const ignored = spawnSync("git", ["check-ignore", "--stdin", "-z"], {
-    cwd: repo, input: paths.join("\0") + "\0", encoding: "utf8", timeout: 30000,
-  });
-  if (ignored.status === 0) throw new Error(`ignored task files cannot be published: ${ignored.stdout.split("\0").filter(Boolean).join(", ")}`);
-  if (ignored.status !== 1) throw new Error(`cannot check task file visibility: ${ignored.stderr || ignored.error?.message || ignored.status}`);
+  assertPublishableTaskPaths(repo, tasks.flatMap((task) => task.files));
 }
 
 export function passingTap(output) {

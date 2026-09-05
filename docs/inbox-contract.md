@@ -149,6 +149,9 @@ Old close-outs and results from other sources or runs cannot complete this run.
    and duplicate Files: lines fail validation. Validation and execution share
    the same task parser.
    Declared files must be visible to Git and outside the harness run directory.
+   Git-administrative paths are excluded, including .git entries at any depth,
+   symlink aliases and relocated Git metadata directories. Normal project files
+   such as .gitignore and .github workflows remain eligible.
    Ignore rules are checked before implementation and again during verification;
    already-tracked files remain eligible when an ignore rule matches them.
 3. A new runner phase implements on a unique `codex/rusubon-*` branch. It may

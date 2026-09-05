@@ -93,6 +93,8 @@ end at the next checkbox or Markdown heading. List every path the task may edit;
 declarations outside task blocks or repeated within a task fail validation.
 Choose paths Git can publish. Ignored untracked paths and the harness run
 directory cannot be task outputs; already-tracked files may match ignore rules.
+Git-administrative paths, including `.git` entries and aliases into Git metadata,
+are excluded. Project files such as `.gitignore` and `.github` workflows are valid.
 
 `Verify:` contains comma-separated command ids, not shell text. `cwd` is relative
 to the repo root. `argv` is an executable and its individual arguments, with no
