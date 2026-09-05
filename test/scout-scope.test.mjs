@@ -177,7 +177,7 @@ test("HTTP validates explicit scope and setup revision, serves browser modules, 
   const response = await request({ scout: opts }); assert.equal(response.status, 202); const launched = await response.json();
   assert.deepEqual(launched.scoutScope.options, opts); assert.equal(launched.scoutScope.source.projectId, "123");
   assert.deepEqual(launched.scoutScope.paths, ["/checkout"]);
-  await waitFor(() => jobs.get(launched.id).status === "waiting"); jobs.answer(launched.id, "approval-1", { allow: true });
+  await waitFor(() => jobs.get(launched.id).status === "waiting"); await jobs.answer(launched.id, "approval-1", { allow: true });
   await waitFor(() => terminalJob(jobs.get(launched.id)) && !jobs.active.size);
   assert.deepEqual(new Jobs(repo).detail(launched.id).scoutScope, launched.scoutScope);
   const actualJobs = new Jobs(repo); t.after(() => actualJobs.close());

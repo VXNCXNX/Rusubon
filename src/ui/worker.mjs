@@ -107,7 +107,7 @@ async function runJob(input) {
     const { worktree, base } = await preparePr(repo, input.source, input.id, { signal: controller.signal, emit });
     process.chdir(worktree);
     try {
-      const result = await runPr({ raw: input.source.value, flags: { report: input.source.kind === "report", issue: input.source.kind === "issue" }, config, probes, run, baseBranch: base, onEvent: emit,
+      const result = await runPr({ raw: input.source.value, flags: { report: input.source.kind === "report", issue: input.source.kind === "issue" }, config, probes, run, baseBranch: base, onEvent: emit, signal: controller.signal,
         beforePublish: async () => {
           // Synchronous verification may have delayed the IPC stop message.
           await new Promise(resolve => setImmediate(resolve));

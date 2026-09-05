@@ -14,7 +14,7 @@ import { assertContextReady, DRAFT_GUARD } from "../src/context.mjs";
 import { collectChecks } from "../src/doctor.mjs";
 import { runClaude } from "../src/ui/claude.mjs";
 import { createRefreshScheduler } from "../src/ui/web/refresh.js";
-import { reportView } from "../src/ui/web/views.js";
+import { authorizationUrl, reportView } from "../src/ui/web/views.js";
 
 const selection = { runner: "claude", model: "claude-sonnet-5", effort: "max" };
 const context = "# Product\nFixture\n# Money paths\n/checkout\n# Intentional friction\nNone\n# Out of scope\nStaging\n";
@@ -32,6 +32,32 @@ test("findings can be archived without research agents, but not during another o
     assert.equal(archive.includes("disabled"), busy);
     assert.equal(publish.includes("disabled"), !prReady || busy);
   }
+});
+
+test("authorization links require HTTPS or an explicit loopback host", () => {
+  for (const url of ["https://auth.example/authorize", "http://localhost:4242/callback", "http://127.0.0.1:4242/callback", "http://[::1]:4242/callback"]) assert.equal(authorizationUrl(url), url);
+  for (const url of ["http://auth.example/authorize", "http://localhost.evil.example/callback", "http://127.0.0.1.evil.example/callback", "https://user:password@auth.example/authorize", "javascript:alert(1)", "data:text/html,login", "//auth.example/authorize", "invalid"]) assert.equal(authorizationUrl(url), null);
+});
+
+for (const mode of ["already closed", "closes during send"]) test(`answer API rejects an IPC channel that is ${mode}`, async t => {
+  const repo = fixture(t), jobs = new Jobs(repo, { worker: helper("ui-worker") });
+  const app = await startDashboard({ repo, jobs, open: false }); t.after(() => app.close());
+  const job = jobs.start({ kind: "scout", selection });
+  await waitFor(() => job.status === "waiting");
+  const child = jobs.active.get(job.id).child;
+  if (mode === "already closed") child.disconnect();
+  else {
+    const send = child.send.bind(child);
+    child.send = (message, callback) => {
+      if (message.type !== "answer") return send(message, callback);
+      queueMicrotask(() => callback(Object.assign(new Error("closed"), { code: "ERR_IPC_CHANNEL_CLOSED" })));
+      return false;
+    };
+  }
+  const response = await fetch(`${app.origin}/api/jobs/${job.id}/answer`, { method: "POST", headers: { "Content-Type": "application/json", "X-Rusubon-Token": app.token }, body: JSON.stringify({ requestId: "approval-1", response: { allow: true } }) });
+  assert.equal(response.status, 400); assert.match((await response.json()).error, /no longer pending/);
+  await waitFor(() => !jobs.active.size);
+  assert.deepEqual(job.requests, []);
 });
 
 for (const outcome of ["stop", "exit", "complete"]) test(`context drafts stay unconfirmed after ${outcome}`, async t => {
@@ -91,7 +117,7 @@ test("setup API rejects stale versions before launch and the worker rechecks aft
   const response = await request(input(repo)); assert.equal(response.status, 202);
   const job = jobs.get((await response.json()).id); await waitFor(() => job.status === "waiting");
   writeLocal(repo, ".rusubon/context.md", context + "\nEdited while queued\n");
-  jobs.answer(job.id, "save", {allow:true}); await waitFor(() => !jobs.active.size);
+  await jobs.answer(job.id, "save", {allow:true}); await waitFor(() => !jobs.active.size);
   assert.equal(job.status, "failed"); assert.match(job.error, /changed on disk/);
   assert.match(workspaceState(repo).context, /Edited while queued/); assert.equal(existsSync(join(repo,"rusubon.json")), false);
 });

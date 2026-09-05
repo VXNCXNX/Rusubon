@@ -79,6 +79,24 @@ test("an asynchronous stop after verification prevents publishing", async () => 
   assert.equal(git(f.repo, ["rev-parse", "HEAD"]), git(f.repo, ["rev-parse", "origin/main"]));
 });
 
+for (const stage of ["commit", "push", "create"]) test(`stop during ${stage} interrupts publishing before its next side effect`, async () => {
+  const f = setup(), controller = new AbortController(), entered = join(f.root, "publishing-entered");
+  const pause = `require('node:fs').writeFileSync(${JSON.stringify(entered)}, 'entered'); require('node:child_process').spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},1500)']);`;
+  if (stage === "create") {
+    const path = join(f.root, "bin/gh");
+    const shim = readFileSync(path, "utf8");
+    writeFileSync(path, shim.replace("if(args[0]==='pr' && args[1]==='create') {", `if(args[0]==='pr' && args[1]==='create') {\n${pause}`));
+  } else writeFileSync(join(f.repo, `.git/hooks/pre-${stage}`), `#!${process.execPath}\n${pause}\n`, { mode: 0o755 });
+  const timer = setInterval(() => { if (existsSync(entered)) controller.abort(); }, 10);
+  try {
+    await assert.rejects(runPr({ raw: "retry", config: { runner: "codex" }, probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run: f.run, signal: controller.signal }), /stopped|abort/i);
+    assert.equal(existsSync(entered), true);
+    assert.equal(existsSync(f.publishedBody), false);
+    assert.ok(!f.ghCalls().some(args => args[0] === "pr" && args[1] === "view"));
+    if (stage !== "create") assert.equal(git(f.repo, ["ls-remote", "origin", "refs/heads/codex/*"]), "");
+  } finally { clearInterval(timer); }
+});
+
 test("maximum-length report slugs publish with bounded names and preserve source identity", async () => {
   const f = setup();
   const slug = "a".repeat(252);

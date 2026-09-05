@@ -83,6 +83,7 @@ export function summarizeRun({ skillName, startedAt, before, now = Date.now(), c
     duration: formatDuration(now - startedAt),
     mcp: mcpFromCloseOut(closeBody),
     closeOut: closeBody == null ? null : rel,
+    closeOutPath: rel,
     closeLine: closeBody ? firstUsefulLine(closeBody) : "",
     reports,
     memory,
@@ -108,7 +109,7 @@ export function formatRunSummary(summary) {
     lines.push(`close-out ${summary.closeOut}`);
     if (summary.closeLine) lines.push(`          ${summary.closeLine}`);
   } else {
-    lines.push(`close-out missing — scout did not write ${closeOutRel(summary.skill)}`);
+    lines.push(`close-out missing, scout did not write ${summary.closeOutPath || closeOutRel(summary.skill)}`);
   }
   return lines.join("\n");
 }

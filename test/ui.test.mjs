@@ -172,8 +172,8 @@ test("jobs retain requests across reads, redact persisted data, settle answers a
   assert.equal(jobs.detail(job.id).requests[0].id, "approval-1");
   assert.doesNotMatch(readFileSync(join(repo, `.rusubon/runs/${job.id}/job.json`), "utf8"), /secret-value/);
   assert.doesNotMatch(JSON.stringify(jobs.detail(job.id)), /secret-value|fakeSecretValue/);
-  jobs.answer(job.id, "approval-1", { allow: true });
-  assert.throws(() => jobs.answer(job.id, "approval-1", { allow: true }), /no longer pending/);
+  await jobs.answer(job.id, "approval-1", { allow: true });
+  await assert.rejects(jobs.answer(job.id, "approval-1", { allow: true }), /no longer pending/);
   await waitFor(() => terminalJob(job) && !jobs.active.size);
   assert.equal(job.status, "completed");
   assert.ok(artifacts(repo, jobs.detail(job.id)).some(row => row.key === "Run/close-out.md"));

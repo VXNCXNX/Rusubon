@@ -18,7 +18,7 @@ export function acquireRepoLock(repo, name = "run.lock") {
   try { write(); } catch (error) {
     if (error.code !== "EEXIST") throw error;
     let old; try { old = read(); } catch { throw new Error(`The lock is unreadable. Inspect .rusubon/runs/${name} before launching.`); }
-    if (!Number.isInteger(old.pid) || old.pid <= 0) throw new Error("Invalid run lock. Inspect .rusubon/runs/run.lock before launching.");
+    if (!Number.isInteger(old.pid) || old.pid <= 0) throw new Error(`Invalid run lock. Inspect .rusubon/runs/${name} before launching.`);
     let alive = true;
     try { process.kill(old.pid, 0); } catch (failure) { if (failure.code === "ESRCH") alive = false; }
     if (alive) throw new Error(name === "ui.lock" ? "A dashboard is already running for this repository. Use its existing URL." : "A run is already active in this repository. Stop it or wait for it to finish.");

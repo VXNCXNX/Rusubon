@@ -97,7 +97,7 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
         return json(res, jobs.start(operation), 202);
       }
       if (parts[0] === "api" && parts[1] === "jobs" && parts.length === 4 && parts[3] === "stop") return json(res, jobs.stop(parts[2]));
-      if (parts[0] === "api" && parts[1] === "jobs" && parts.length === 4 && parts[3] === "answer") { jobs.answer(parts[2], input.requestId, input.response); return json(res, { accepted: true }); }
+      if (parts[0] === "api" && parts[1] === "jobs" && parts.length === 4 && parts[3] === "answer") { await jobs.answer(parts[2], input.requestId, input.response); return json(res, { accepted: true }); }
       json(res, { error: "Not found" }, 404);
     } catch (error) { if (!res.headersSent) json(res, { error: safeText(error.message) }, error.statusCode || 400); else res.destroy(); }
   });

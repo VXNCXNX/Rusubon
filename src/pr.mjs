@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
+import { spawnBounded } from "../skills/spec/scripts/process.mjs";
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { assertPrReady, defaultProbes, redact } from "./doctor.mjs";
@@ -53,13 +53,6 @@ function assertHead(repo, head, branch) {
   }
 }
 
-/** Run a GitHub CLI operation with optional stdin in the checkout and throw on failure. */
-function gh(repo, args, input) {
-  const result = spawnSync("gh", args, { cwd: repo, input, encoding: "utf8", timeout: 120000, killSignal: "SIGKILL" });
-  if (result.status !== 0) throw new Error(`gh ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
-  return result.stdout.trim();
-}
-
 /** Return sorted literal paths in a Git delta, counting renames as removal and addition. */
 function changedGitPaths(repo, diffArgs) {
   return git(repo, ["diff", "--no-renames", "--name-only", "-z", ...diffArgs, "--"])
@@ -68,7 +61,17 @@ function changedGitPaths(repo, diffArgs) {
 
 /** Commit verified files and create a draft PR after rechecking scope and content.
  * Throws before the next publication step if hooks change the expected evidence. */
-function publish({ repo, specDir, runDir, receipt, result, branch, base, files }) {
+async function publish({ repo, specDir, runDir, receipt, result, branch, base, files, signal, beforePublish }) {
+  const command = async (bin, args, input) => {
+    // Verification and receipt checks use synchronous reads. Drain queued stop
+    // requests again before every command, including each remote side effect.
+    await beforePublish();
+    if (signal?.aborted) throw new Error("Run stopped before publishing");
+    const outcome = await spawnBounded(bin, args, { cwd: repo, input, signal });
+    if (outcome.error?.code === "ABORT_ERR") throw outcome.error;
+    if (outcome.status !== 0) throw new Error(`${bin} ${args[0]} failed: ${outcome.stderr || outcome.error?.message || outcome.status}`);
+    return outcome.stdout.trimEnd();
+  };
   if (typeof result.pr_title !== "string" || !/^(fix|feat|refactor|test|docs|chore)(\([^)\n]+\))?: [^\n]+$/.test(result.pr_title)
       || typeof result.pr_body !== "string" || !/^## Agent context\s*$/im.test(result.pr_body)
       || !result.pr_body.includes(relative(repo, specDir))) {
@@ -84,7 +87,7 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
     + `\n\nSpec hash: \`${receipt.plan_hash}\`. Code content hash: \`${receipt.tree_hash}\`.\n`;
   writeFileSync(bodyFile, body);
   const parent = git(repo, ["rev-parse", "HEAD"]);
-  git(repo, ["--literal-pathspecs", "add", "--", ...files]);
+  await command("git", ["--literal-pathspecs", "add", "--", ...files]);
   const staged = changedGitPaths(repo, ["--cached", parent]);
   // Git content filters can normalize a verified edit back to its base content.
   if (staged.some((path) => !files.includes(path))) {
@@ -93,7 +96,7 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   if (!staged.some((path) => !path.startsWith(`${relative(repo, specDir)}/`))) {
     throw new Error("implementation made no product change after Git normalization");
   }
-  git(repo, ["commit", "-m", result.pr_title]);
+  await command("git", ["commit", "-m", result.pr_title]);
   const commit = git(repo, ["rev-parse", "HEAD"]);
   if (git(repo, ["rev-list", "--parents", "-n", "1", commit]) !== `${commit} ${parent}`) {
     throw new Error("commit ancestry changed during publishing");
@@ -105,22 +108,22 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   assertReceipt(repo, specDir, receipt);
   assertWorktreeMatchesHead(repo);
   if (git(repo, ["branch", "--show-current"]) !== branch) throw new Error("branch changed before push");
-  git(repo, ["push", "--set-upstream", "origin", `${commit}:refs/heads/${branch}`]);
+  await command("git", ["push", "--set-upstream", "origin", `${commit}:refs/heads/${branch}`]);
   assertHead(repo, commit, branch);
   assertReceipt(repo, specDir, receipt);
   assertWorktreeMatchesHead(repo);
   // Publish the validated in-memory body; hooks may change its on-disk copy.
-  const url = gh(repo, ["pr", "create", "--draft", "--base", base, "--head", branch,
+  const url = await command("gh", ["pr", "create", "--draft", "--base", base, "--head", branch,
     "--title", result.pr_title, "--body-file", "-"], body);
   // Opening the review is best effort on hosts without a browser.
-  try { gh(repo, ["pr", "view", url, "--web"]); }
+  try { await command("gh", ["pr", "view", url, "--web"]); }
   catch { console.log(`open for review: ${url}`); }
   return url;
 }
 
 /** Run human-launched research, spec validation, implementation and draft publication.
  * Returns run metadata and a verdict; workflow failures preserve files and write a close-out. */
-export async function runPr({ raw, flags, config, probes = defaultProbes(), run = runWith, baseBranch, onEvent = () => {}, beforePublish = () => {} }) {
+export async function runPr({ raw, flags, config, probes = defaultProbes(), run = runWith, baseBranch, onEvent = () => {}, beforePublish = () => {}, signal }) {
   const researchConfig = { ...config, ...(config.spec || {}) };
   const implementationConfig = { ...config, ...(config.implementation || {}) };
   assertPrReady(researchConfig, probes);
@@ -218,7 +221,7 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     assertHead(repo, head, branch);
     await beforePublish();
     onEvent({ type: "phase", name: "Draft PR", status: "running" });
-    const url = publish({ repo, specDir, runDir, receipt, result: implementation, branch, base, files });
+    const url = await publish({ repo, specDir, runDir, receipt, result: implementation, branch, base, files, signal, beforePublish });
     onEvent({ type: "phase", name: "Draft PR", status: "completed", url });
     return finish("immediately_actionable", implementation.reason, url);
   } catch (error) {

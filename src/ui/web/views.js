@@ -76,6 +76,15 @@ export function scopeView(scope) {
 
 export function safeUrl(value) { try { const url = new URL(value); return ["https:", "http:"].includes(url.protocol) ? url.href : "#"; } catch { return "#"; } }
 
+export function authorizationUrl(value) {
+  try {
+    const url = new URL(value);
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (url.username || url.password) return null;
+    return url.protocol === "https:" || (url.protocol === "http:" && loopback) ? url.href : null;
+  } catch { return null; }
+}
+
 export function activityView(job) {
   const activity = job.events.filter(event => ["message", "tool", "model", "selection_verified"].includes(event.type));
   const logs = job.events.filter(event => event.type === "log");

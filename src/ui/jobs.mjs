@@ -127,12 +127,21 @@ export class Jobs extends EventEmitter {
       job.finishedAt = new Date().toISOString(); job.requests = []; this.persist(job); this.emit("change", job.id);
     }
   }
-  answer(id, requestId, response) {
+  async answer(id, requestId, response) {
     const job = this.get(id), active = this.active.get(id);
     if (!active || !job.requests.some(request => request.id === requestId) || job.status !== "waiting") throw new Error("This request is no longer pending");
     if (typeof response?.allow !== "boolean") throw new Error("Choose allow or decline");
-    active.child.send({ type: "answer", id: requestId, response });
+    const unavailable = () => {
+      if (!terminalJob(job) && job.status !== "stopping") {
+        job.status = "failed"; job.error = "Worker disconnected before receiving your response."; job.requests = [];
+        this.persist(job); this.emit("change", id); this.stop(id);
+      }
+      return new Error("This request is no longer pending");
+    };
+    if (!active.child.connected) throw unavailable();
     job.requests = job.requests.filter(request => request.id !== requestId); job.status = job.requests.length ? "waiting" : "running"; this.persist(job); this.emit("change", id);
+    try { await new Promise((resolve, reject) => active.child.send({ type: "answer", id: requestId, response }, error => error ? reject(error) : resolve())); }
+    catch { throw unavailable(); }
   }
   stop(id) {
     const job = this.get(id), active = this.active.get(id); if (!active) return job;

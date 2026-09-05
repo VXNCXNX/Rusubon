@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { spawnBoundedSync } from "../skills/spec/scripts/process.mjs";
+import { spawnBounded, spawnBoundedSync } from "../skills/spec/scripts/process.mjs";
 import { trashFixture } from "./helpers/cleanup.mjs";
 
 /** Distinguish runnable descendants from killed processes awaiting OS reaping. */
@@ -96,4 +96,29 @@ test("native Windows rejects timed commands before launching a supervisor or chi
   } finally {
     Object.defineProperty(process, "platform", descriptor);
   }
+});
+
+test("asynchronous supervision preserves command I/O, failures, and pre-launch cancellation", async () => {
+  const result = await spawnBounded(process.execPath, ["-e", "process.stdout.write(require('node:fs').readFileSync(0));process.stderr.write('diagnostic');process.exit(3)"], { input: "PR body from stdin", timeout: 2000 });
+  assert.equal(result.status, 3); assert.equal(result.stdout, "PR body from stdin"); assert.equal(result.stderr, "diagnostic");
+  const missing = await spawnBounded(join(tmpdir(), "rusubon-no-such-executable"), [], { timeout: 2000 });
+  assert.equal(missing.error?.code, "ENOENT");
+  const cancelled = await spawnBounded(process.execPath, ["-e", "throw new Error('must not run')"], { signal: AbortSignal.abort() });
+  assert.equal(cancelled.error?.code, "ABORT_ERR"); assert.equal(cancelled.stderr, "");
+});
+
+for (const mode of ["abort", "timeout", "output overflow", "normal exit"]) test(`asynchronous ${mode} stops stubborn descendants and closes their output pipes`, { timeout: 10000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "rusubon-async-group-")), marker = join(dir, "pid"), controller = new AbortController();
+  const child = `require('node:fs').writeFileSync(${JSON.stringify(marker)}, String(process.pid)); process.on('SIGTERM',()=>{}); ${mode === "output overflow" ? "process.stdout.write('x'.repeat(100000));" : ""} setTimeout(()=>{},30000);`;
+  const parent = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(child)}],{stdio:'inherit'}); process.on('SIGTERM',()=>{}); ${mode === "normal exit" ? `setInterval(()=>{if(require('node:fs').existsSync(${JSON.stringify(marker)}))process.exit(7)},10);` : "setTimeout(()=>{},30000);"}`;
+  const timer = mode === "abort" ? setInterval(() => { if (existsSync(marker)) controller.abort(); }, 10) : null;
+  let pid;
+  try {
+    const result = await spawnBounded(process.execPath, ["-e", parent], { signal: controller.signal, timeout: 2000, maxBuffer: mode === "output overflow" ? 1024 : 1_000_000 });
+    assert.ok(existsSync(marker)); pid = Number(readFileSync(marker, "utf8"));
+    for (let i = 0; i < 40 && running(pid); i++) await new Promise(resolve => setTimeout(resolve, 25));
+    assert.ok(!running(pid));
+    if (mode === "normal exit") assert.equal(result.status, 7);
+    else assert.equal(result.error?.code, { abort: "ABORT_ERR", timeout: "ETIMEDOUT", "output overflow": "ENOBUFS" }[mode]);
+  } finally { clearInterval(timer); if (pid && running(pid)) process.kill(pid, "SIGKILL"); trashFixture(dir); }
 });
