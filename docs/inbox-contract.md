@@ -12,7 +12,9 @@ rusubon.json                       # committed — projectId + host (us|eu) + ru
 .rusubon/memory/<prefix>/<slug>.md # committed — scout + decline why
 .rusubon/inbox/reports/*.md        # gitignored — open findings
 .rusubon/inbox/archive/*.md        # gitignored — declined
-.rusubon/runs/*.md                 # gitignored — close-outs
+.rusubon/runs/*.md                 # gitignored: scout close-outs
+.rusubon/runs/*-friction-candidates.json # gitignored: phase-two session candidates
+.rusubon/runs/<run-id>/            # gitignored: PR prompts, results, logs, receipt and close-out
 ```
 
 The OSS package ships no product facts. Fill `context.md` and `rusubon.json` in *your* app.
@@ -129,3 +131,84 @@ If those tools are not available in the runner session, write a close-out that s
 | `rusubon decline <slug> --why` | you | archive + `memory/noise` |
 
 `research` is a human-launched door (`rusubon pr`). Friction never calls it. Not the PostHog wizard. No auto-merge. No cron.
+
+## Research-to-PR execution
+
+`rusubon pr` requires a clean checkout root on a named base branch matching
+`origin`. A unique run id owns `.rusubon/runs/<run-id>/` and
+`docs/plans/<date>-<source>-<run-id>/`.
+Old close-outs and results from other sources or runs cannot complete this run.
+Generated directory and branch names use at most 160 characters of the source
+slug plus the run UUID. Results retain the full source reference.
+Runner phases have a 30-minute deadline; each verification command has two minutes.
+On POSIX, timed commands run under a supervisor in a fresh process group.
+The group receives SIGKILL on timeout, interruption, output overflow or completion,
+so ordinary descendants stop too and cannot retain captured output pipes.
+The supervisor checks for caller termination every 100 ms, including Ctrl-C,
+and removes its private request files when the caller cannot clean them up.
+Processes that deliberately create a separate session are outside that group.
+Native Windows timed commands are rejected before dispatch; use WSL for POSIX
+process-group supervision. No taskkill fallback is used.
+A phase timeout writes a failure close-out; a verification timeout also prevents
+issuing a receipt.
+
+1. Research writes the auto spec and a JSON result. It does not modify product
+   code. The result includes run_id, source, phase, verdict and a nonempty reason.
+2. The harness validates requirements, task coverage, decisions and verification
+   commands. Only an immediately_actionable result advances. The spec's run and
+   source must match, with no completed tasks or closure.
+   The spec directory contains only requirements.md, tasks.md, .spec-state.json,
+   and design.md for bugs or features. Extra entries, including ignored files
+   and nested directories, fail validation before implementation or verification.
+   Each checkbox task has one nonempty Files: declaration. Stray declarations
+   and duplicate Files: lines fail validation. Validation and execution share
+   the same task parser. Paths may be comma-separated with whole-path backtick
+   quoting, or a JSON string array. Commas inside quoted paths are preserved;
+   empty entries and malformed quoting fail validation. Proven by: uses the
+   same syntax for exactly one path.
+   Declared files must be visible to Git and outside the harness run directory.
+   Git-administrative paths are excluded, including .git entries at any depth,
+   symlink aliases and relocated Git metadata directories. Normal project files
+   such as .gitignore and .github workflows remain eligible.
+   Ignore rules are checked before implementation and again during verification;
+   already-tracked files remain eligible when an ignore rule matches them.
+3. A new runner phase implements on a unique `codex/rusubon-*` branch. It may
+   change declared task files, checkboxes and closure, but not the validated plan.
+   Its result also supplies pr_title and pr_body, including Agent context.
+4. The harness runs the spec's verification commands in order, stopping at the
+   first failure, error or signal. Commands
+   use executable argv and a repo-relative cwd. Test commands emit TAP with at
+   least one named passing case and valid test plans at every nesting level;
+   the TAP version header is optional. Nested wrappers count only their passing
+   leaf cases, and skipped or TODO subtrees contribute no passing cases.
+   Other checks use exit status. Invalid TAP, failures, zero-case plans,
+   skipped-only suites, timeouts and code changes during verification stop the run.
+5. A harness receipt binds command results and logs to the run, source, spec
+   and non-ignored code contents. The harness checks it before committing,
+   pushing and creating a draft PR. It opens the PR for review and never merges.
+   Staging treats verified filenames literally. The staged delta may omit edits
+   normalized away by Git, but cannot add paths and must include a product change.
+   After hooks run, the commit must retain that exact path delta and the expected
+   parent. This also rejects force-added run artifacts excluded from receipts.
+   The validated PR body is sent directly through stdin. Its saved run artifact
+   is a reference copy, so hooks cannot change the published text by rewriting it.
+
+The harness writes `close-out.md` for completed phases and workflow failures.
+Workflow errors are redacted before being returned to callers, and the CLI
+redacts errors before printing them, including failures before a run is created.
+After each runner phase, result JSON is checked even if the runner failed.
+Credentials in decoded strings or keys are redacted in the saved artifact and
+the run stops. Malformed JSON is replaced with a diagnostic rather than retained.
+Early preflight failures do not create a run. Failed runs preserve their files
+and branch. Receipt checks govern publishing through the harness; they do not
+sandbox a runner with the user's credentials or prove test semantics. Ignored
+dependencies and environment state are outside the code-content fingerprint.
+Before research and publishing, tracked contents must match HEAD through a
+temporary index without visibility flags. The check preserves the user's index,
+applies Git content filters, and recurses into initialized submodules.
+Count cases from TAP structure, regardless of whether their names match files.
+Node's default TAP reporter emits empty-file wrappers as passing tests with no
+distinctive TAP metadata. Receipts cannot establish whether such cases ran assertions.
+Submodule fingerprints use the checked-out commit, or the indexed gitlink for
+an uninitialized checkout. Uncommitted submodule changes, including untracked
+files, stop the run because the parent PR cannot publish those contents.

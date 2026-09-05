@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { existsSync } from "node:fs";
 import { PLACEHOLDER_HOST, PLACEHOLDER_PROJECT, resolveHost } from "./config.mjs";
 import { PLACEHOLDER, loadContext } from "./context.mjs";
@@ -9,15 +9,17 @@ function which(bin) {
   return r.status === 0 ? r.stdout.trim() : "";
 }
 
-function redact(text) {
+/** Replace recognized PostHog tokens and Bearer credentials before displaying or saving text. */
+export function redact(text) {
   return String(text || "")
     .replace(/phx_[A-Za-z0-9]+/g, "phx_REDACTED")
     .replace(/phc_[A-Za-z0-9]+/g, "phc_REDACTED")
     .replace(/Bearer\s+\S+/gi, "Bearer REDACTED");
 }
 
+/** Run a preflight probe with a 15-second deadline and return status plus combined output. */
 function runCmd(bin, args) {
-  const r = spawnSync(bin, args, { encoding: "utf8", timeout: 15000 });
+  const r = spawnSync(bin, args, { encoding: "utf8", timeout: 15000, killSignal: "SIGKILL" });
   return {
     status: r.status,
     out: `${r.stdout || ""}\n${r.stderr || ""}`.trim(),

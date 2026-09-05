@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,9 +15,13 @@ function writePrompt(prompt) {
   return file;
 }
 
+/** Apply the caller's deadline to the supervised runner process group. */
 function spawnOpts(opts, extra = {}) {
   const out = { cwd: process.cwd(), ...extra };
-  if (opts.timeoutMs > 0) out.timeout = opts.timeoutMs;
+  if (opts.timeoutMs > 0) {
+    out.timeout = opts.timeoutMs;
+    out.killSignal = "SIGKILL";
+  }
   return out;
 }
 

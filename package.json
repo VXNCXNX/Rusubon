@@ -22,7 +22,7 @@
     "LICENSE-PostHog-MIT"
   ],
   "engines": {
-    "node": ">=20"
+    "node": "20 || >=22"
   },
   "license": "Apache-2.0",
   "repository": {
@@ -37,5 +37,8 @@
     "cursor",
     "codex",
     "agent-skills"
-  ]
+  ],
+  "dependencies": {
+    "tap-parser": "18.3.4"
+  }
 }

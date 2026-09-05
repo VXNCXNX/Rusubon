@@ -15,4 +15,5 @@ Local scout harness. Inbox is files in the product repo. PostHog is the warehous
 - Adapted scout conventions: PostHog MIT. Keep `NOTICE` / `LICENSE-PostHog-MIT`.
 - This is not a PostHog product. Say "works with PostHog", never "PostHog Rusubon".
 - `rusubon pr <slug|#N|url>` is a human-launched research pass. Draft via `gh pr create --draft`. Never merge. No cron. Not the PostHog wizard. Read `writing-pr-descriptions` before `gh pr create`. Friction never calls this.
+- For the auto-spec phases, verification receipts and publishing ownership in `rusubon pr`, read `docs/inbox-contract.md` under Research-to-PR execution.
 - Contract: `docs/inbox-contract.md`.
