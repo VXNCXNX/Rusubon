@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -11,6 +11,39 @@ import { trashFixture } from "./helpers/cleanup.mjs";
 function running(pid) {
   const result = spawnSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" });
   return result.status === 0 && result.stdout.trim() && !result.stdout.trim().startsWith("Z");
+}
+
+for (const signal of ["SIGINT", "SIGTERM", "SIGKILL"]) {
+  test(`caller ${signal} stops its supervisor and descendants before the command deadline`, { skip: process.platform === "win32", timeout: 10000 }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "rusubon-cancel-test-"));
+    const marker = join(dir, "pids");
+    const descendant = `require('node:fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify([process.pid,process.ppid,Number(process.argv[1])]));
+process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});setTimeout(()=>{},30000);`;
+    const command = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(descendant)},String(process.ppid)],{stdio:'inherit'});
+process.on('SIGINT',()=>{});process.on('SIGTERM',()=>{});setTimeout(()=>{},30000);`;
+    const script = `import {spawnBoundedSync} from ${JSON.stringify(new URL("../skills/spec/scripts/process.mjs", import.meta.url).href)};
+spawnBoundedSync(process.execPath,['-e',${JSON.stringify(command)}],{timeout:30000});`;
+    const caller = spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: "ignore", env: { ...process.env, TMPDIR: dir, TMP: dir, TEMP: dir } });
+    let pids = [];
+    try {
+      for (let attempts = 0; attempts < 100 && !existsSync(marker); attempts++) await new Promise((resolve) => setTimeout(resolve, 25));
+      assert.ok(existsSync(marker), "supervised descendant started before interruption");
+      pids = JSON.parse(readFileSync(marker, "utf8"));
+      assert.equal(readdirSync(dir).filter((name) => name.startsWith("rusubon-process-")).length, 1);
+      caller.kill(signal);
+      for (let attempts = 0; attempts < 40 && [caller.pid, ...pids].some(running); attempts++) await new Promise((resolve) => setTimeout(resolve, 25));
+      assert.ok(!running(caller.pid), "caller stopped");
+      assert.ok(pids.every((pid) => !running(pid)), "supervisor and both descendants stopped promptly, without waiting for the deadline");
+      assert.deepEqual(readdirSync(dir), ["pids"], "orphaned supervisor removes its private request and response files");
+    } finally {
+      if (running(caller.pid)) caller.kill("SIGKILL");
+      if (!pids.length && existsSync(marker)) pids = JSON.parse(readFileSync(marker, "utf8"));
+      for (const pid of pids) {
+        try { process.kill(pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+      }
+      trashFixture(dir);
+    }
+  });
 }
 
 for (const mode of ["timeout", "output overflow", "normal exit"]) {

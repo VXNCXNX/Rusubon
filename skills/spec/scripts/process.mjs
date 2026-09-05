@@ -17,11 +17,11 @@ export function spawnBoundedSync(command, args, options = {}) {
   const request = join(dir, "request.json");
   const response = join(dir, "response.json");
   try {
-    writeFileSync(request, JSON.stringify({ command, args, timeout: options.timeout }), { mode: 0o600 });
+    writeFileSync(request, JSON.stringify({ command, args, timeout: options.timeout, parentPid: process.pid }), { mode: 0o600 });
     writeFileSync(response, "", { mode: 0o600 });
     const result = spawnSync(process.execPath, [supervisor, request, response], {
       ...options, timeout: undefined, detached: true,
-      // The supervisor handles interruption and native output-buffer overflow.
+      // The supervisor watches caller loss and handles native output-buffer overflow.
       killSignal: "SIGTERM",
     });
     if (result.error) return result;

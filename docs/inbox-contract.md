@@ -144,6 +144,8 @@ Runner phases have a 30-minute deadline; each verification command has two minut
 On POSIX, timed commands run under a supervisor in a fresh process group.
 The group receives SIGKILL on timeout, interruption, output overflow or completion,
 so ordinary descendants stop too and cannot retain captured output pipes.
+The supervisor checks for caller termination every 100 ms, including Ctrl-C,
+and removes its private request files when the caller cannot clean them up.
 Processes that deliberately create a separate session are outside that group.
 Native Windows timed commands are rejected before dispatch; use WSL for POSIX
 process-group supervision. No taskkill fallback is used.
