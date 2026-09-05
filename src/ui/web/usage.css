@@ -8,7 +8,7 @@
 .usage-provider > div { display: flex; gap: 8px; align-items: center; font-size: 15px; }
 .usage-provider strong { margin-left: auto; font-weight: 500; }
 .usage-provider p { margin-top: 4px; padding-left: 17px; }
-.usage-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.usage-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; flex-shrink: 0; }
 .usage-claude { color: var(--orange); }
 .usage-codex { color: var(--brand); }
 .usage-plot { min-width: 0; }
@@ -19,8 +19,8 @@
 .usage-chart { display: block; width: 100%; overflow: visible; }
 .usage-chart text { font-size: 12px; fill: var(--muted); }
 .usage-grid { stroke: var(--line); stroke-width: 1; }
-.usage-line { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.usage-area { fill: currentColor; opacity: 0.07; }
+.usage-line { fill: none; stroke: currentcolor; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.usage-area { fill: currentcolor; opacity: 0.07; }
 .usage-chart-target { fill: transparent; cursor: crosshair; }
 .usage-chart-target:hover, .usage-chart-target:focus-visible { fill: var(--ink); fill-opacity: 0.035; outline: 1px solid var(--line); outline-offset: 0; }
 .usage-chart-detail { min-height: 22px; padding-left: 7.6%; font-size: 12px; }

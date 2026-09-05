@@ -10,6 +10,27 @@ const count = value => Number.isSafeInteger(value) && value >= 0 ? value : 0;
 const measured = value => Number.isSafeInteger(value) && value >= 0;
 const modelId = value => typeof value === "string" ? value.replace(/\[1m\]$/, "").slice(0, 120) : "unknown";
 const dayOf = value => Number.isFinite(Date.parse(value)) ? new Date(value).toISOString().slice(0, 10) : null;
+const DAY_MS = 86_400_000;
+
+/** Resolve one UTC window for both file selection and daily aggregation. */
+function usageWindow({ days = 30, runner = "all", now = new Date() } = {}) {
+  if (![7, 30, 90].includes(days) || !["all", "claude", "codex"].includes(runner)) throw new Error("Choose 7, 30, or 90 days and a supported runner");
+  const today = new Date(now); today.setUTCHours(0, 0, 0, 0);
+  if (!Number.isFinite(today.valueOf())) throw new Error("Invalid usage date");
+  const to = today.valueOf() + DAY_MS;
+  return { days, runner, from: to - days * DAY_MS, to, now: today };
+}
+
+/** Prune only runs whose metadata rules out overlap; PRs can use both runners. */
+function matchesWindow(job, { from, to, runner }) {
+  const started = Date.parse(job.startedAt), finished = Date.parse(job.finishedAt);
+  if (started >= to || finished < from) return false;
+  if (runner === "all") return true;
+  const runners = [job.selection?.runner];
+  if (job.kind === "pr") runners.push(job.specSelection?.runner);
+  // Missing legacy metadata cannot prove that a runner has no usage here.
+  return runners.some(value => value === runner || !["claude", "codex"].includes(value));
+}
 
 // Adapted from ccusage's CodexRawUsage deserializer (MIT), pinned at
 // ea2d241976bf42f79bcc2b2ea245baf88b412cc1, rust/adapters/codex/src/types.rs.
@@ -91,11 +112,10 @@ function add(target, record, jobId, price) {
 }
 const serialize = value => ({ ...value, runs: value.runs.size, bases: [...value.bases], cost: value.unpricedTokens > 0 && value.pricedTokens === 0 ? null : value.cost });
 
-export function aggregateUsage(histories, { days = 30, runner = "all", now = new Date(), pricing }) {
-  if (![7, 30, 90].includes(days) || !["all", "claude", "codex"].includes(runner)) throw new Error("Choose 7, 30, or 90 days and a supported runner");
-  const end = new Date(now); end.setUTCHours(0, 0, 0, 0);
+export function aggregateUsage(histories, options) {
+  const window = usageWindow(options), { days, runner, from, to } = window, { pricing } = options;
   const daily = new Map();
-  for (let i = days - 1; i >= 0; i--) { const day = new Date(end.valueOf() - i * 86_400_000).toISOString().slice(0, 10); daily.set(day, { ...bucket(day), providers: { claude: bucket("claude"), codex: bucket("codex") } }); }
+  for (let time = from; time < to; time += DAY_MS) { const day = new Date(time).toISOString().slice(0, 10); daily.set(day, { ...bucket(day), providers: { claude: bucket("claude"), codex: bucket("codex") } }); }
   const total = bucket("total"), models = new Map(), providers = new Map(["claude", "codex"].map(key => [key, bucket(key)]));
   let missingRuns = 0, partialRuns = 0;
   for (const { job, records, partial, missingSessions = [] } of histories) {
@@ -108,8 +128,7 @@ export function aggregateUsage(histories, { days = 30, runner = "all", now = new
       const day = daily.get(record.day);
       for (const target of [total, models.get(key), providers.get(record.runner), day, day.providers[record.runner]]) add(target, record, job.id, price);
     }
-    const selected = runner === "all" || job.selection?.runner === runner || job.specSelection?.runner === runner;
-    const relevant = selected && (daily.has(dayOf(job.startedAt)) || daily.has(dayOf(job.finishedAt)) || !job.finishedAt);
+    const relevant = matchesWindow(job, window);
     const missingPhase = missingSessions.some(s => daily.has(s.day) && (runner === "all" || s.runner === runner));
     if (!included && (relevant || missingPhase)) missingRuns++;
     else if (included && (partial || missingPhase)) partialRuns++;
@@ -144,12 +163,12 @@ export function createUsageReader(repo) {
     } catch { cache.delete(job.id); return { job, records: [], partial: true }; }
   }
   return async (jobs, options = {}) => {
-    const histories = [];
+    const window = usageWindow(options), histories = [];
     // Read one file at a time, retaining only usage counters, never transcript text.
     const agentJobs = jobs.filter(job => ["scout", "context", "pr"].includes(job.kind));
     const ids = new Set(agentJobs.map(job => job.id));
     for (const id of cache.keys()) if (!ids.has(id)) cache.delete(id);
-    for (const job of agentJobs) histories.push(await history(job));
-    return aggregateUsage(histories, { ...options, pricing: pricingState(repo) });
+    for (const job of agentJobs) if (matchesWindow(job, window)) histories.push(await history(job));
+    return aggregateUsage(histories, { ...window, pricing: pricingState(repo) });
   };
 }

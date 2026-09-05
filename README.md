@@ -247,7 +247,8 @@ discounts can differ from the catalog estimate.
 Expand **How estimates work & model rates** to inspect the source or save rates
 for a model seen in your runs. Overrides live in `.rusubon/usage-rates.json`,
 stay local, and apply when the runner has no reliable cost. Reset restores the
-catalog. Updating rates recalculates historical estimates.
+catalog. Saving rates adds missing Git ignore rules for older installations.
+Updating rates recalculates historical estimates.
 
 The Codex token normalization adapts a small part of
 [ccusage](https://github.com/ccusage/ccusage) under its MIT license. Attribution

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readRawLocal, writeLocal } from "./workspace.mjs";
+import { ensureGitignore, USAGE_RATES_PATH } from "../config.mjs";
 
 export const PRICING_CHECKED_AT = "2026-09-05";
 const claudeSource = "https://platform.claude.com/docs/en/about-claude/pricing";
@@ -17,7 +18,7 @@ export const MODEL_RATES = [
   codex("gpt-6-astra", 10, 50, 1),
 ];
 const keys = ["input", "output", "cacheRead", "cacheWrite", "cacheWrite1h"];
-const path = ".rusubon/usage-rates.json";
+const path = USAGE_RATES_PATH;
 const revision = text => createHash("sha256").update(text).digest("hex");
 
 export function pricingState(repo) {
@@ -49,6 +50,9 @@ export function saveUsageRate(repo, input) {
   const overrides = JSON.parse(raw), key = `${input.runner}:${input.model}`;
   if (input.reset === true) delete overrides[key];
   else overrides[key] = { runner: input.runner, model: input.model, ...Object.fromEntries(keys.map(key => [key, input[key]])) };
+  // Upgrade repositories initialized before usage rates existed, before writing
+  // either the private data or its atomic temporary file.
+  ensureGitignore(repo);
   writeLocal(repo, path, JSON.stringify(overrides, null, 2) + "\n");
   return pricingState(repo);
 }

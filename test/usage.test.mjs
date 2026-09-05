@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, appendFileSync, symlinkSync } from "node:fs";
+import fs, { mkdtempSync, appendFileSync, symlinkSync, readFileSync, existsSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { trashFixture } from "./helpers/cleanup.mjs";
@@ -19,6 +22,72 @@ const snapshot = (inputTokens, cachedInputTokens, outputTokens, cacheWriteInputT
 const event = (total, extra = {}) => ({ type: "usage", at, usage: { total, last: total }, ...extra });
 const fixture = t => { const repo = mkdtempSync(join(tmpdir(), "rusubon-usage-")); t.after(() => trashFixture(repo)); return repo; };
 const aggregate = (histories, options = {}) => aggregateUsage(histories, { pricing, now: new Date(at), ...options });
+const git = (repo, ...args) => spawnSync("git", ["-C", repo, ...args], { encoding: "utf8" });
+
+test("init ignores repository-local usage rates and their atomic temporary files", t => {
+  const repo = fixture(t);
+  assert.equal(git(repo, "init", "-q").status, 0);
+  const init = spawnSync(process.execPath, [fileURLToPath(new URL("../bin/rusubon.mjs", import.meta.url)), "init"], { cwd: repo, encoding: "utf8" });
+  assert.equal(init.status, 0, init.stderr);
+  for (const path of [".rusubon/usage-rates.json", ".rusubon/usage-rates.json.123.tmp"])
+    assert.equal(git(repo, "check-ignore", "--no-index", path).status, 0, `${path} must stay local`);
+});
+
+test("saving rates upgrades old ignore rules once and preserves existing content", t => {
+  const repo = fixture(t), original = "# Product rules\r\nnode_modules/\r\n.rusubon/inbox/\r\n.rusubon/runs/";
+  assert.equal(git(repo, "init", "-q").status, 0);
+  writeLocal(repo, ".gitignore", original);
+  const save = () => saveUsageRate(repo, { ...MODEL_RATES.at(-1), input: 8, revision: pricingState(repo).revision });
+  save();
+  assert.equal(git(repo, "check-ignore", "--no-index", ".rusubon/usage-rates.json").status, 0);
+  const updated = readFileSync(join(repo, ".gitignore"), "utf8");
+  assert.ok(updated.startsWith(original));
+  save();
+  assert.equal(readFileSync(join(repo, ".gitignore"), "utf8"), updated);
+  assert.doesNotMatch(git(repo, "status", "--porcelain", "--untracked-files=all").stdout, /usage-rates/);
+});
+
+test("saving rates refuses a linked gitignore before writing local data", t => {
+  const repo = fixture(t), outside = fixture(t);
+  writeLocal(outside, ".gitignore", "# External rules\n");
+  symlinkSync(join(outside, ".gitignore"), join(repo, ".gitignore"));
+  assert.throws(() => saveUsageRate(repo, { ...MODEL_RATES.at(-1), revision: pricingState(repo).revision }), /symbolic link/);
+  assert.equal(readFileSync(join(outside, ".gitignore"), "utf8"), "# External rules\n");
+  assert.equal(existsSync(join(repo, ".rusubon/usage-rates.json")), false);
+});
+
+test("reader opens only relevant histories and preserves boundary deltas and mixed-runner PRs", async t => {
+  const repo = fixture(t), opened = [], original = fs.createReadStream;
+  t.mock.method(fs, "createReadStream", (path, options) => { opened.push(path); return original(path, options); });
+  syncBuiltinESMExports();
+  t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports(); });
+  const jobs = [
+    { ...job, id: "ui-01", startedAt: "2026-08-01", finishedAt: "2026-08-02" },
+    { ...job, id: "ui-02", selection: { runner: "claude" } },
+    { ...job, id: "ui-03", startedAt: "2026-09-06", finishedAt: "2026-09-06" },
+    { ...job, id: "ui-04", startedAt: "2026-08-29T23:58:00Z", finishedAt: "2026-08-30T00:00:00Z" },
+    { ...job, id: "ui-05", kind: "pr", selection: { runner: "claude" }, specSelection: selection },
+    { ...job, id: "ui-06", startedAt: "2026-08-01", finishedAt: undefined, status: "running" },
+    { ...job, id: "ui-07", selection: undefined },
+    { ...job, id: "ui-08", kind: "pr", selection: { runner: "claude" } },
+  ];
+  for (const row of jobs) {
+    const events = row.id === "ui-04" ? [event(snapshot(100, 50, 10), { at: row.startedAt }), event(snapshot(300, 150, 30), { at: row.finishedAt })]
+      : [event(snapshot(100, 0, 10), { at: row.finishedAt || at, runner: row.id === "ui-02" ? "claude" : "codex", model: selection.model })];
+    writeLocal(repo, `.rusubon/runs/${row.id}/events.jsonl`, events.map(e => JSON.stringify(e)).join("\n") + "\n");
+  }
+  const read = createUsageReader(repo);
+  const result = await read(jobs, { days: 7, runner: "codex", now: new Date(at) });
+  assert.deepEqual(opened.map(path => path.split("/").at(-2)), ["ui-04", "ui-05", "ui-06", "ui-07", "ui-08"]);
+  assert.equal(result.total.tokens.total, 660);
+  assert.equal(result.daily[0].tokens.total, 220, "keep the pre-window baseline for cumulative counters");
+  assert.equal(result.total.runs, 5);
+  opened.length = 0;
+  await assert.rejects(read(jobs, { days: -1 }), /Choose/);
+  assert.equal(opened.length, 0, "reject invalid filters before touching histories");
+  await read(jobs, { days: 90, runner: "codex", now: new Date(at) });
+  assert.deepEqual(opened.map(path => path.split("/").at(-2)), ["ui-01"], "expanded windows load previously skipped history and reuse matching cache entries");
+});
 
 test("Codex cache reads/writes partition input and reasoning is not counted again", () => {
   assert.deepEqual(codexTokens({ ...snapshot(100, 80, 20, 40), reasoningOutputTokens: 15 }), { input: 0, cacheRead: 80, cacheWrite: 20, output: 20, total: 120 });
