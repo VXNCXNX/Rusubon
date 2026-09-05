@@ -16,6 +16,7 @@ if (!specDir || options.some((flag) => flag !== "--complete") || (receiptIndex >
   process.exit(2);
 }
 const complete = flags.includes("--complete");
+/** Split numbered Markdown sections into identifier and body pairs using a global pattern. */
 function blocks(text, pattern) {
   const starts = [...text.matchAll(pattern)];
   return starts.map((match, index) => [
@@ -23,9 +24,13 @@ function blocks(text, pattern) {
   ]);
 }
 const problems = [];
+/** Collect a validation problem so the command can report all failures together. */
 const fail = (message) => problems.push(message);
+/** Accept only strings containing at least one non-whitespace character. */
 const nonempty = (value) => typeof value === "string" && value.trim().length > 0;
+/** Check whether an existing path resolves to a regular file. */
 const isFile = (path) => existsSync(path) && statSync(path).isFile();
+/** Read a regular spec file inside the checkout, recording unreadable files as validation failures. */
 const read = (name) => {
   try {
     const full = join(resolve(specDir), name);

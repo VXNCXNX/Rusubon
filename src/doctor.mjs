@@ -9,6 +9,7 @@ function which(bin) {
   return r.status === 0 ? r.stdout.trim() : "";
 }
 
+/** Replace recognized PostHog tokens and Bearer credentials before displaying or saving text. */
 export function redact(text) {
   return String(text || "")
     .replace(/phx_[A-Za-z0-9]+/g, "phx_REDACTED")

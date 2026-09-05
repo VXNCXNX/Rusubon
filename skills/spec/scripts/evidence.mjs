@@ -4,17 +4,23 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
+/** Return a SHA-256 content digest for a string or buffer. */
 export const hash = (value) => createHash("sha256").update(value).digest("hex");
 
+/** List the only permitted spec files for a quick, bug or feature plan. */
 export const specFiles = (type) => ["requirements.md", "tasks.md", ".spec-state.json",
   ...(type === "quick" ? [] : ["design.md"])];
 
+/** Run Git in a checkout with an optional environment and return stdout without trailing whitespace.
+ * Throw on failure; NUL-delimited filename output retains its terminal NUL. */
 export function git(repo, args, env) {
   const result = spawnSync("git", args, { cwd: repo, env, encoding: "utf8", timeout: 120000, maxBuffer: 32 * 1024 * 1024 });
   if (result.status !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
   return result.stdout.trimEnd();
 }
 
+/** Compare tracked contents with HEAD using an independent index and Git content filters.
+ * Reject hidden edits and dirty submodules while preserving the checkout index flags. */
 export function assertWorktreeMatchesHead(repo) {
   // A fresh index has no assume-unchanged or skip-worktree flags. Git still
   // applies the repository's normal content filters, including line endings.
@@ -44,6 +50,7 @@ export function assertWorktreeMatchesHead(repo) {
   }
 }
 
+/** Resolve a repo-relative path and reject traversal or existing symlink escapes. */
 export function localPath(repo, path) {
   if (typeof path !== "string" || !path || isAbsolute(path) || path.includes("\0")) throw new Error("expected a repository-relative path");
   const full = resolve(repo, path);
@@ -65,6 +72,7 @@ export function localPath(repo, path) {
   return full;
 }
 
+/** Fingerprint Git-visible files and clean submodule commits, excluding harness run artifacts. */
 export function snapshot(repo) {
   const names = git(repo, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"]).split("\0").filter(Boolean);
   const gitlinks = new Map(git(repo, ["ls-files", "--stage", "-z"]).split("\0")
@@ -94,6 +102,8 @@ export function snapshot(repo) {
   return { files, digest: hash(JSON.stringify(files)) };
 }
 
+/** Return a clean submodule revision or its indexed commit when uninitialized.
+ * Reject dirty, mismatched or partially populated submodule checkouts. */
 function submoduleCommit(full, name, indexedCommit) {
   if (!existsSync(full)) return indexedCommit;
   if (!lstatSync(full).isDirectory()) throw new Error(`submodule is not a directory: ${name}`);
@@ -112,11 +122,13 @@ function submoduleCommit(full, name, indexedCommit) {
   return git(full, ["rev-parse", "HEAD"]);
 }
 
+/** Return sorted paths whose fingerprints differ, including additions and removals. */
 export function changedFiles(before, after) {
   return [...new Set([...Object.keys(before.files), ...Object.keys(after.files)])]
     .filter((path) => before.files[path] !== after.files[path]).sort();
 }
 
+/** Hash the spec while excluding task completion checkmarks and implementation closure. */
 export function planHash(dir) {
   const state = JSON.parse(readFileSync(join(dir, ".spec-state.json"), "utf8"));
   delete state.closure;
@@ -127,6 +139,7 @@ export function planHash(dir) {
   }) }));
 }
 
+/** Reject receipts that do not match the current run, spec, code and verification logs. */
 export function assertReceipt(repo, dir, receipt) {
   const state = JSON.parse(readFileSync(join(dir, ".spec-state.json"), "utf8"));
   if (receipt?.version !== 1 || receipt.run_id !== state.run_id || receipt.source !== state.source

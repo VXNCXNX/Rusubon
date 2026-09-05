@@ -8,6 +8,8 @@ import { assertPublishableTaskPaths } from "./pr-task-paths.mjs";
 import { skillsDir } from "./run.mjs";
 import { redact } from "./doctor.mjs";
 
+/** Validate the spec in a child process and reject task paths Git cannot publish.
+ * Supplying a receipt also requires completed tasks and matching verification evidence. */
 export function validateSpec(repo, specDir, receiptPath) {
   const args = [join(skillsDir(), "spec/scripts/check-spec.mjs"), specDir];
   if (receiptPath) args.push("--complete", "--receipt", receiptPath);
@@ -17,6 +19,8 @@ export function validateSpec(repo, specDir, receiptPath) {
   assertPublishableTaskPaths(repo, tasks.flatMap((task) => task.files));
 }
 
+/** Return the count of named passing TAP leaf cases.
+ * Reject malformed streams, failures and runs containing only suites or skipped cases. */
 export function passingTap(output) {
   // npm may print its script banner before the TAP stream starts.
   // Version headers are optional. Preserve comments, nested tests and failures
@@ -24,6 +28,7 @@ export function passingTap(output) {
   const start = output.search(/^[ \t]*(?:TAP version\b|(?:not )?ok\b|\d+\.\.|Bail out!|#|pragma\b)/im);
   const parser = new Parser({ strict: true });
   let extra = false;
+  /** Accumulate passing leaves while associating each nested stream with its closing result. */
   function countCases(stream) {
     const counts = { passed: 0 };
     let child;
@@ -48,6 +53,8 @@ export function passingTap(output) {
   return counts.passed;
 }
 
+/** Run every declared verification command against unchanged spec and code contents.
+ * Save redacted logs and a matching receipt, then validate completed implementation evidence. */
 export function verifyImplementation({ repo, specDir, runDir, runId, source }) {
   validateSpec(repo, specDir);
   const state = JSON.parse(readFileSync(join(specDir, ".spec-state.json"), "utf8"));

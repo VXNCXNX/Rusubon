@@ -1,4 +1,6 @@
 // Files accepts Markdown code spans or a JSON string array for arbitrary names.
+/** Parse literal paths from comma-separated code spans or a JSON string array.
+ * Preserve quoted punctuation and whitespace; throw on empty or malformed declarations. */
 export function parsePathList(value) {
   const text = value.trim();
   if (text.startsWith("[")) {

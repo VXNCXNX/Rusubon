@@ -12,7 +12,8 @@ rusubon.json                       # committed — projectId + host (us|eu) + ru
 .rusubon/memory/<prefix>/<slug>.md # committed — scout + decline why
 .rusubon/inbox/reports/*.md        # gitignored — open findings
 .rusubon/inbox/archive/*.md        # gitignored — declined
-.rusubon/runs/*.md                 # gitignored — close-outs
+.rusubon/runs/*.md                 # gitignored: scout close-outs
+.rusubon/runs/<run-id>/            # gitignored: PR prompts, results, logs, receipt and close-out
 ```
 
 The OSS package ships no product facts. Fill `context.md` and `rusubon.json` in *your* app.

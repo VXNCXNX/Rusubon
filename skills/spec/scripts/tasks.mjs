@@ -1,5 +1,7 @@
 // Shared task boundaries and file declarations for validation and execution.
 import { parsePathList } from "./path-list.mjs";
+/** Extract checkbox task blocks and exact file declarations.
+ * Return tasks and validation problems, including stray or duplicate Files lines. */
 export function parseTasks(text) {
   const boundaries = [...text.matchAll(/^[ \t]*-[ \t]*\[([ xX])\][ \t]+|^#{1,6}[ \t]+/gm)];
   const tasks = boundaries.flatMap((match, index) => match[1] === undefined ? [] : [{

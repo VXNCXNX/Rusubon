@@ -13,6 +13,7 @@ import { parseTasks } from "../skills/spec/scripts/tasks.mjs";
 
 export { buildPrPrompt } from "./pr-prompt.mjs";
 
+/** Read a phase result and reject stale run identity or incomplete verdicts. */
 function readResult(path, runId, source, phase) {
   let result;
   try { result = JSON.parse(readFileSync(path, "utf8")); }
@@ -25,23 +26,28 @@ function readResult(path, runId, source, phase) {
   return result;
 }
 
+/** Reject runner changes to the expected revision or branch. */
 function assertHead(repo, head, branch) {
   if (git(repo, ["rev-parse", "HEAD"]) !== head || git(repo, ["branch", "--show-current"]) !== branch) {
     throw new Error("runner changed the Git revision or branch; refusing to publish");
   }
 }
 
+/** Run a GitHub CLI operation in the checkout and throw on failure. */
 function gh(repo, args) {
   const result = spawnSync("gh", args, { cwd: repo, encoding: "utf8", timeout: 120000 });
   if (result.status !== 0) throw new Error(`gh ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
   return result.stdout.trim();
 }
 
+/** Return sorted literal paths in a Git delta, counting renames as removal and addition. */
 function changedGitPaths(repo, diffArgs) {
   return git(repo, ["diff", "--no-renames", "--name-only", "-z", ...diffArgs, "--"])
     .split("\0").filter(Boolean).sort();
 }
 
+/** Commit verified files and create a draft PR after rechecking scope and content.
+ * Throws before the next publication step if hooks change the expected evidence. */
 function publish({ repo, specDir, runDir, receipt, result, branch, base, files }) {
   if (typeof result.pr_title !== "string" || !/^(fix|feat|refactor|test|docs|chore)(\([^)\n]+\))?: [^\n]+$/.test(result.pr_title)
       || typeof result.pr_body !== "string" || !/^## Agent context\s*$/im.test(result.pr_body)
@@ -90,6 +96,8 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   return url;
 }
 
+/** Run human-launched research, spec validation, implementation and draft publication.
+ * Returns run metadata and a verdict; workflow failures preserve files and write a close-out. */
 export async function runPr({ raw, flags, config, probes = defaultProbes(), run = runWith }) {
   assertPrReady(config, probes);
   const source = resolveSource(parseSource(raw, flags), probes);
@@ -114,11 +122,13 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   const specPath = `docs/plans/${new Date().toISOString().slice(0, 10)}-${slug}-${runId}`;
   const specDir = localPath(repo, specPath);
   const closeOut = join(runDir, "close-out.md");
+  /** Write the redacted close-out and return the run outcome. */
   const finish = (verdict, reason, url) => {
     writeFileSync(closeOut, redact(`# Research ${label}\n\nRun: ${runId}\nVerdict: ${verdict}\n\n${reason}\n\nSpec: ${specPath}\n${url ? `\nDraft PR: ${url}\n` : ""}`));
     console.log(`close-out ${relative(repo, closeOut)}`);
     return { runId, verdict, closeOut, specPath, url };
   };
+  /** Dispatch one runner phase and require a result belonging to this run. */
   const phase = async (name) => {
     const prompt = buildPrPrompt(source, config, { phase: name, runId, runDir: relative(repo, runDir), specPath });
     writeFileSync(join(runDir, `${name}-prompt.md`), prompt);

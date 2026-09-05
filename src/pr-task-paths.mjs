@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { git, localPath } from "../skills/spec/scripts/evidence.mjs";
 
+/** Reject declared paths outside the checkout, in Git metadata, in runs or ignored by Git. */
 export function assertPublishableTaskPaths(repo, declarations) {
   const gitDirs = ["--git-dir", "--git-common-dir"].map((option) =>
     realpathSync(resolve(repo, git(repo, ["rev-parse", option]))));

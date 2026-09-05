@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { git } from "../../skills/spec/scripts/evidence.mjs";
 import { trashFixture } from "./cleanup.mjs";
 
+/** Create a temporary product checkout and bare remote with a simulated two-phase runner.
+ * Return runner state, recorded GitHub calls and trash-based fixture cleanup. */
 export function fixture() {
   const root = mkdtempSync(join(tmpdir(), "rusubon-pr-test-"));
   const repo = join(root, "product");

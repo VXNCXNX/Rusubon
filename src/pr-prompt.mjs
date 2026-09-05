@@ -5,6 +5,7 @@ import { formatIssueRef } from "./pr-source.mjs";
 import { loadSkill, skillsDir } from "./run.mjs";
 import { redact } from "./doctor.mjs";
 
+/** Read confirmed product context, omitting missing or placeholder content. */
 function optionalContext() {
   try {
     const { body } = loadContext();
@@ -12,6 +13,7 @@ function optionalContext() {
   } catch { return ""; }
 }
 
+/** Compose a redacted phase prompt from run identity, source data and bundled skills. */
 export function buildPrPrompt(source, config, extras = {}) {
   const research = extras.research || loadSkill("research");
   const spec = extras.spec || loadSkill("spec");
