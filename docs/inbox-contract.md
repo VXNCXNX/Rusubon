@@ -175,6 +175,8 @@ Old close-outs and results from other sources or runs cannot complete this run.
    normalized away by Git, but cannot add paths and must include a product change.
    After hooks run, the commit must retain that exact path delta and the expected
    parent. This also rejects force-added run artifacts excluded from receipts.
+   The validated PR body is sent directly through stdin. Its saved run artifact
+   is a reference copy, so hooks cannot change the published text by rewriting it.
 
 The harness writes `close-out.md` for completed phases and workflow failures.
 Early preflight failures do not create a run. Failed runs preserve their files

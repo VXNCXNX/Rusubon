@@ -33,9 +33,9 @@ function assertHead(repo, head, branch) {
   }
 }
 
-/** Run a GitHub CLI operation in the checkout and throw on failure. */
-function gh(repo, args) {
-  const result = spawnSync("gh", args, { cwd: repo, encoding: "utf8", timeout: 120000 });
+/** Run a GitHub CLI operation with optional stdin in the checkout and throw on failure. */
+function gh(repo, args, input) {
+  const result = spawnSync("gh", args, { cwd: repo, input, encoding: "utf8", timeout: 120000 });
   if (result.status !== 0) throw new Error(`gh ${args[0]} failed: ${result.stderr || result.error?.message || result.status}`);
   return result.stdout.trim();
 }
@@ -59,9 +59,10 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   if (redact(result.pr_body) !== result.pr_body || redact(result.pr_title) !== result.pr_title) {
     throw new Error("PR text contains a credential; refusing to publish");
   }
-  writeFileSync(bodyFile, `${result.pr_body.trim()}\n\n## Harness verification\n\n`
+  const body = `${result.pr_body.trim()}\n\n## Harness verification\n\n`
     + receipt.commands.map((command) => `- ${command.id}: exit 0${command.passed ? `, ${command.passed} passing TAP cases` : ""}.`).join("\n")
-    + `\n\nSpec hash: \`${receipt.plan_hash}\`. Code content hash: \`${receipt.tree_hash}\`.\n`);
+    + `\n\nSpec hash: \`${receipt.plan_hash}\`. Code content hash: \`${receipt.tree_hash}\`.\n`;
+  writeFileSync(bodyFile, body);
   const parent = git(repo, ["rev-parse", "HEAD"]);
   git(repo, ["--literal-pathspecs", "add", "--", ...files]);
   const staged = changedGitPaths(repo, ["--cached", parent]);
@@ -88,8 +89,9 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   assertHead(repo, commit, branch);
   assertReceipt(repo, specDir, receipt);
   assertWorktreeMatchesHead(repo);
+  // Publish the validated in-memory body; hooks may change its on-disk copy.
   const url = gh(repo, ["pr", "create", "--draft", "--base", base, "--head", branch,
-    "--title", result.pr_title, "--body-file", bodyFile]);
+    "--title", result.pr_title, "--body-file", "-"], body);
   // Opening the review is best effort on hosts without a browser.
   try { gh(repo, ["pr", "view", url, "--web"]); }
   catch { console.log(`open for review: ${url}`); }

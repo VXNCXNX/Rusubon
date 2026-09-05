@@ -11,13 +11,19 @@ export function fixture() {
   const repo = join(root, "product");
   mkdirSync(repo); mkdirSync(join(root, "bin"));
   const ghLog = join(root, "gh.jsonl");
+  const publishedBody = join(root, "published-body.md");
   writeFileSync(join(root, "bin/gh"), `#!/usr/bin/env node
 import {appendFileSync} from 'node:fs';
 const args=process.argv.slice(2);
 appendFileSync(${JSON.stringify(ghLog)}, JSON.stringify(args)+'\\n');
 if(args[0]==='repo') console.log(JSON.stringify({nameWithOwner:'acme/app'}));
 if(args[0]==='issue') console.log(JSON.stringify({number:12,title:'Retry is disabled',body:'Failed search prevents retry'}));
-if(args[0]==='pr' && args[1]==='create') console.log('https://github.com/acme/app/pull/99');
+if(args[0]==='pr' && args[1]==='create') {
+  const fs = require('node:fs');
+  const bodyFile = args[args.indexOf('--body-file') + 1];
+  fs.writeFileSync(${JSON.stringify(publishedBody)}, fs.readFileSync(bodyFile === '-' ? 0 : bodyFile));
+  console.log('https://github.com/acme/app/pull/99');
+}
 `, { mode: 0o755 });
   // The executable has no extension, so force CommonJS rather than depend on Node syntax detection.
   const shim = readFileSync(join(root, "bin/gh"), "utf8").replace("import {appendFileSync} from 'node:fs';", "const {appendFileSync}=require('node:fs');");
@@ -68,7 +74,7 @@ if(args[0]==='pr' && args[1]==='create') console.log('https://github.com/acme/ap
       pr_body: `## Problem\nFailed searches prevent retry.\n\n## Changes\nRestore retry after failure.\n\n## Agent context\nAuto spec: ${specPath}` }));
     return { status: 0 };
   };
-  return { root, repo, calls, run, get latest() { return latest; },
+  return { root, repo, calls, run, publishedBody, get latest() { return latest; },
     ghCalls: () => { try { return readFileSync(ghLog, "utf8").trim().split("\n").map(JSON.parse); } catch { return []; } },
     cleanup: () => trashFixture(root),
   };

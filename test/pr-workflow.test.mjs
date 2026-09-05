@@ -382,6 +382,22 @@ test("post-verification commit hooks cannot publish changed code", async () => {
   assert.equal(git(f.repo, ["ls-remote", "origin", `refs/heads/${branch}`]), "");
 });
 
+test("Git hooks cannot replace the validated PR body with run artifact contents", async () => {
+  for (const hook of ["pre-commit", "post-commit", "pre-push"]) {
+    const f = setup();
+    writeFileSync(join(f.repo, `.git/hooks/${hook}`),
+      "#!/bin/sh\nfor body in .rusubon/runs/*/pr-body.md; do printf 'unvalidated hook text' > \"$body\"; done\n", { mode: 0o755 });
+    const result = await f.start();
+    assert.ok(result.url);
+    assert.equal(readFileSync(join(dirname(result.closeOut), "pr-body.md"), "utf8"), "unvalidated hook text");
+    const body = readFileSync(f.publishedBody, "utf8");
+    assert.match(body, /Failed searches prevent retry/);
+    assert.match(body, /## Harness verification/);
+    assert.ok(body.includes(result.specPath));
+    assert.ok(!body.includes("unvalidated hook text"));
+  }
+});
+
 test("staged and hook-added run artifacts cannot enter a published commit", async () => {
   for (const phase of ["implementation", "commit hook"]) {
     const f = setup();
