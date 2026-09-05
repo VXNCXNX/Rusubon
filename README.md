@@ -14,6 +14,9 @@ Contract: [docs/inbox-contract.md](docs/inbox-contract.md).
 
 ## Install
 
+Use macOS, Linux, or Windows through WSL. Native Windows timed subprocesses
+are rejected before launch because supervision requires POSIX process groups.
+
 ```bash
 git clone https://github.com/VXNCXNX/rusubon.git
 cd rusubon

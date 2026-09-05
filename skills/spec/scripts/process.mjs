@@ -10,6 +10,9 @@ const supervisor = fileURLToPath(new URL("./process-supervisor.mjs", import.meta
  * Preserve captured or inherited stdio and native spawn errors. */
 export function spawnBoundedSync(command, args, options = {}) {
   if (!(options.timeout > 0)) return spawnSync(command, args, options);
+  if (process.platform === "win32") {
+    throw new Error("Timed subprocess supervision requires POSIX process groups; use WSL on Windows");
+  }
   const dir = mkdtempSync(join(tmpdir(), "rusubon-process-"));
   const request = join(dir, "request.json");
   const response = join(dir, "response.json");
@@ -17,7 +20,7 @@ export function spawnBoundedSync(command, args, options = {}) {
     writeFileSync(request, JSON.stringify({ command, args, timeout: options.timeout }), { mode: 0o600 });
     writeFileSync(response, "", { mode: 0o600 });
     const result = spawnSync(process.execPath, [supervisor, request, response], {
-      ...options, timeout: undefined, detached: process.platform !== "win32",
+      ...options, timeout: undefined, detached: true,
       // The supervisor handles interruption and native output-buffer overflow.
       killSignal: "SIGTERM",
     });

@@ -145,7 +145,8 @@ On POSIX, timed commands run under a supervisor in a fresh process group.
 The group receives SIGKILL on timeout, interruption, output overflow or completion,
 so ordinary descendants stop too and cannot retain captured output pipes.
 Processes that deliberately create a separate session are outside that group.
-On Windows, timeouts use taskkill with its descendant-tree option.
+Native Windows timed commands are rejected before dispatch; use WSL for POSIX
+process-group supervision. No taskkill fallback is used.
 A phase timeout writes a failure close-out; a verification timeout also prevents
 issuing a receipt.
 
@@ -193,6 +194,9 @@ issuing a receipt.
 The harness writes `close-out.md` for completed phases and workflow failures.
 Workflow errors are redacted before being returned to callers, and the CLI
 redacts errors before printing them, including failures before a run is created.
+After each runner phase, result JSON is checked even if the runner failed.
+Credentials in decoded strings or keys are redacted in the saved artifact and
+the run stops. Malformed JSON is replaced with a diagnostic rather than retained.
 Early preflight failures do not create a run. Failed runs preserve their files
 and branch. Receipt checks govern publishing through the harness; they do not
 sandbox a runner with the user's credentials or prove test semantics. Ignored

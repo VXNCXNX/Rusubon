@@ -13,11 +13,31 @@ import { parseTasks } from "../skills/spec/scripts/tasks.mjs";
 
 export { buildPrPrompt } from "./pr-prompt.mjs";
 
-/** Read a phase result and reject stale run identity or incomplete verdicts. */
+/** Read a phase result, sanitize stored credentials, and validate its run identity. */
 function readResult(path, runId, source, phase) {
-  let result;
-  try { result = JSON.parse(readFileSync(path, "utf8")); }
+  let raw;
+  try { raw = readFileSync(path, "utf8"); }
   catch { throw new Error(`${phase} did not write a valid result for this run`); }
+  let result, original, sanitized;
+  try {
+    result = JSON.parse(raw);
+    original = JSON.stringify(result);
+    sanitized = JSON.stringify(result, (_key, value) => {
+      if (typeof value === "string") return redact(value);
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return Object.fromEntries(Object.entries(value).map(([key, entry]) => [redact(key), entry]));
+      }
+      return value;
+    });
+  } catch {
+    // Invalid JSON cannot be safely inspected, so retain only a diagnostic.
+    writeFileSync(path, JSON.stringify({ error: "invalid phase result" }) + "\n");
+    throw new Error(`${phase} did not write a valid result for this run`);
+  }
+  if (sanitized !== original) {
+    writeFileSync(path, sanitized + "\n");
+    throw new Error(`${phase} result contained credentials; sanitized the artifact and stopped the run`);
+  }
   if (result?.run_id !== runId || result.source !== source || result.phase !== phase
       || !["immediately_actionable", "requires_human_input", "not_actionable"].includes(result.verdict)
       || typeof result.reason !== "string" || !result.reason.trim()) {
@@ -137,9 +157,17 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     const prompt = buildPrPrompt(source, config, { phase: name, runId, runDir: relative(repo, runDir), specPath });
     writeFileSync(join(runDir, `${name}-prompt.md`), prompt);
     console.log(`${name}  ${label}  run=${runId}`);
-    const result = await run(config.runner, prompt, { phase: name, timeoutMs: 30 * 60 * 1000 });
+    let result, parsed, resultError;
+    try {
+      result = await run(config.runner, prompt, { phase: name, timeoutMs: 30 * 60 * 1000 });
+    } finally {
+      // Failed or interrupted runners may still have written sensitive artifacts.
+      try { parsed = readResult(join(runDir, `${name}.json`), runId, label, name); }
+      catch (error) { resultError = error; }
+    }
     if (result.status !== 0 || result.timedOut) throw new Error(`${name} runner ${result.timedOut ? "timed out" : `exited ${result.status}`}`);
-    return readResult(join(runDir, `${name}.json`), runId, label, name);
+    if (resultError) throw resultError;
+    return parsed;
   };
   try {
     const research = await phase("research");

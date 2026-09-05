@@ -54,3 +54,13 @@ test("supervised commands preserve stdin, stdout, stderr, exit codes and spawn f
   const missing = spawnBoundedSync(join(tmpdir(), "rusubon-no-such-executable"), [], { encoding: "utf8", timeout: 2000 });
   assert.equal(missing.error?.code, "ENOENT");
 });
+
+test("native Windows rejects timed commands before launching a supervisor or child", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(process, "platform");
+  try {
+    Object.defineProperty(process, "platform", { value: "win32" });
+    assert.throws(() => spawnBoundedSync(process.execPath, ["-e", "process.exit(0)"], { timeout: 1000 }), /WSL/);
+  } finally {
+    Object.defineProperty(process, "platform", descriptor);
+  }
+});

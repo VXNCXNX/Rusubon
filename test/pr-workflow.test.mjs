@@ -73,6 +73,36 @@ test("workflow errors redact generated credentials before returning them to call
   }
 });
 
+test("credential-bearing phase artifacts are sanitized even when runners fail", async () => {
+  for (const phase of ["research", "implementation"]) {
+    for (const outcome of ["success", "nonzero", "throw", "malformed"]) {
+      const f = setup();
+      const secret = "ph" + "c_TESTONLYNOTAREALCREDENTIAL";
+      let artifact;
+      await assert.rejects(f.start(async (...args) => {
+        await f.run(...args);
+        if (f.calls.at(-1) === phase) {
+          artifact = f.latest.resultPath;
+          const result = JSON.parse(readFileSync(artifact, "utf8"));
+          result.reason = secret;
+          result.pr_body = secret;
+          result.extra = { [secret]: [secret, "Bearer\nTESTONLYBEARER"] };
+          const json = JSON.stringify(result).replaceAll("phc_", "ph\\u0063_");
+          writeFileSync(artifact, outcome === "malformed" ? json.slice(0, -1) : json);
+          if (outcome === "throw") throw new Error("runner failed");
+          return { status: outcome === "nonzero" ? 1 : 0 };
+        }
+        return { status: 0 };
+      }));
+      const saved = readFileSync(artifact, "utf8");
+      const decoded = JSON.stringify(JSON.parse(saved));
+      assert.ok(!decoded.includes(secret), "saved result must not retain decoded credentials");
+      assert.ok(!decoded.includes("TESTONLYBEARER"), "nested bearer credentials must be redacted");
+      assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+    }
+  }
+});
+
 test("an old daily close-out cannot make a no-op runner succeed", async () => {
   const f = setup();
   mkdirSync(join(f.repo, ".rusubon/runs"), { recursive: true });
