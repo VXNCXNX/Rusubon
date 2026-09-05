@@ -8,6 +8,7 @@ import { localPath, readJsonLocal, readRawLocal, writeLocal } from "./workspace.
 import { lineSink, safeText, safeValue } from "./process.mjs";
 import { DRAFT_GUARD } from "../context.mjs";
 import { sealDraft } from "../context-draft.mjs";
+import { resolvePermissionMode } from "../permissions.mjs";
 
 const WORKER = fileURLToPath(new URL("./worker.mjs", import.meta.url));
 const WATCHDOG = fileURLToPath(new URL("./watchdog.mjs", import.meta.url));
@@ -58,10 +59,11 @@ export class Jobs extends EventEmitter {
   }
   start(input) {
     if (process.platform === "win32") throw new Error("Use WSL for supervised agent runs on Windows");
+    if (["scout", "context", "pr"].includes(input.kind)) input = { ...input, permissionMode: resolvePermissionMode(input.permissionMode) };
     const release = acquireRepoLock(this.repo);
     try { this.recoverContext(); } catch (error) { release(); throw error; }
     const id = `ui-${randomUUID()}`;
-    const job = { id, kind: input.kind, selection: input.selection, specSelection: input.specSelection, scoutScope: input.scoutScope, source: input.source || null, status: "starting", startedAt: new Date().toISOString(), requests: [], eventCount: 0, logBytes: 0 };
+    const job = { id, kind: input.kind, selection: input.selection, permissionMode: input.permissionMode, specSelection: input.specSelection, scoutScope: input.scoutScope, source: input.source || null, status: "starting", startedAt: new Date().toISOString(), requests: [], eventCount: 0, logBytes: 0 };
     let child;
     try {
       this.persist(job); this.jobs.set(id, job);

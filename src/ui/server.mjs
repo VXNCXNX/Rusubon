@@ -82,7 +82,10 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
         if (!["init", "setup", "login", "connect_mcp", "context", "scout", "pr", "decline"].includes(input.kind)) throw new Error("Unsupported operation");
         const operation = { kind: input.kind };
         if (["login", "connect_mcp"].includes(input.kind)) { if (!Object.hasOwn(MODEL_ALLOWLIST, input.runner)) throw new Error("Unsupported runner"); operation.runner = input.runner; }
-        if (["context", "scout", "pr"].includes(input.kind)) operation.selection = validateSavedSelection(input.kind === "context" ? { ...input.selection, effort: "low" } : input.selection);
+        if (["context", "scout", "pr"].includes(input.kind)) {
+          operation.selection = validateSavedSelection(input.kind === "context" ? { ...input.selection, effort: "low" } : input.selection);
+          operation.permissionMode = workspaceState(repo).config.permissionMode;
+        }
         if (input.kind === "pr") operation.specSelection = validateSavedSelection(input.specSelection || workspaceState(repo).config.spec, "spec");
         if (input.kind === "scout" && input.scout !== undefined) {
           const workspace = workspaceState(repo);

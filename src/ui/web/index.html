@@ -61,6 +61,11 @@
           <div id="connections" class="connection-grid"></div>
           <form id="setup-form" class="panel setup-form">
             <div id="setup-conflict" class="notice" role="status" hidden><p>Setup changed on disk. Your edits are kept. Review the current files before saving.</p><div class="actions"><button type="button" class="text-button" id="view-current-setup">View current setup</button><button type="button" class="text-button" id="load-current-setup">Replace form with current setup</button></div></div>
+            <div class="permission-settings">
+              <div><h2>Agent permissions</h2><p class="caption">For Claude Code and Codex, in the dashboard and CLI.</p></div>
+              <label>Permission mode<select id="permission-mode" name="permissionMode" aria-describedby="permission-help" required><option value="auto">Auto (default)</option><option value="ask">Ask</option><option value="yolo">YOLO</option></select></label>
+              <div class="permission-note"><p id="permission-help" class="caption" role="status"></p><p class="caption">Save to apply to future runs. Product questions and sign-in still need you.</p></div>
+            </div>
             <div class="row"><h2>Product context</h2><span id="context-status" class="badge">Not confirmed</span></div>
             <p class="caption">Kept in rusubon.json and .rusubon/context.md, beside your code.</p>
             <div class="form-grid">

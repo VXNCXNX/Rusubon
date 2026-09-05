@@ -272,7 +272,7 @@ test("Codex approval answers preserve protocol shapes and fail closed on unsuppo
 
 test("async scout phases use isolated run files and the configured low-effort read model", async t => {
   const repo = fixture(t), original = process.cwd(); process.chdir(repo); t.after(() => process.chdir(original));
-  initConfig(); saveSetup(repo, { ...selection, projectId: "123", host: "eu", context, confirmed: true, readModel: "claude-opus-5" });
+  initConfig(); saveSetup(repo, { ...selection, permissionMode: "yolo", projectId: "123", host: "eu", context, confirmed: true, readModel: "claude-opus-5" });
   writeLocal(repo, candidatesRel("friction"), JSON.stringify({ ids: [{ id: "stale-session" }] }));
   const config = loadConfig(), calls = [], phases = [];
   const probes = { which: () => "/usr/bin/claude", claudeAuth: () => ({ loggedIn: true }), claudeMcpList: () => "posthog: connected" };
@@ -285,12 +285,13 @@ test("async scout phases use isolated run files and the configured low-effort re
   const result = await runSkill("friction", config, probes, { run, runId: "ui-test", onEvent: event => phases.push(event) });
   assert.equal(result.closeOut, ".rusubon/runs/ui-test/close-out.md"); assert.equal(calls.length, 2);
   assert.equal(calls[0].options.model, "claude-sonnet-5"); assert.equal(calls[1].options.model, "claude-opus-5"); assert.equal(calls[1].options.effort, "low");
+  assert.ok(calls.every(call => call.options.permissionMode === "yolo"));
   assert.match(calls[1].prompt, /fresh-session/); assert.doesNotMatch(calls[1].prompt, /stale-session/);
   assert.equal(phases.at(-1).status, "completed");
 });
 
 test("failed context drafting restores the human-review placeholder", async t => {
   const repo = fixture(t), original = process.cwd(); process.chdir(repo); t.after(() => process.chdir(original)); initConfig();
-  await assert.rejects(draftContext({ run: async () => { writeLocal(repo, ".rusubon/context.md", context); throw new Error("runner disconnected"); } }), /disconnected/);
+  await assert.rejects(draftContext({ run: async (_runner, _prompt, options) => { assert.equal(options.permissionMode, "auto"); writeLocal(repo, ".rusubon/context.md", context); throw new Error("runner disconnected"); } }), /disconnected/);
   assert.equal(workspaceState(repo).confirmed, false);
 });

@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pkgRoot } from "./config.mjs";
+import { claudePermissions, codexPermissions, resolvePermissionMode } from "./permissions.mjs";
 
 function which(bin) {
   const r = spawnSync("which", [bin], { encoding: "utf8" });
@@ -39,7 +40,8 @@ export const RUNNERS = {
       this.warn();
       writePrompt(prompt);
       const bin = process.env.RUSUBON_CLAUDE || "claude";
-      const args = ["-p", prompt, "--permission-mode", "bypassPermissions", "--add-dir", pkgRoot()];
+      const permissions = claudePermissions(opts.permissionMode);
+      const args = ["-p", prompt, "--permission-mode", permissions.permissionMode, ...(permissions.allowDangerouslySkipPermissions ? ["--allow-dangerously-skip-permissions"] : []), "--add-dir", pkgRoot()];
       if (opts.model) args.push("--model", opts.model);
       if (opts.effort) args.push("--effort", opts.effort);
       return spawnSync(bin, args, spawnOpts(opts, { stdio: "inherit" }));
@@ -57,9 +59,12 @@ export const RUNNERS = {
     which: () => which("codex"),
     run(prompt, opts = {}) {
       const file = writePrompt(prompt);
+      const mode = resolvePermissionMode(opts.permissionMode), permissions = codexPermissions(mode);
+      const permissionArgs = mode === "auto" ? ["--approve-for-me"] : mode === "yolo" ? ["--dangerously-bypass-approvals-and-sandbox"]
+        : ["--sandbox", permissions.sandbox, "-c", `approval_policy=${JSON.stringify(permissions.approvalPolicy)}`, "-c", `approvals_reviewer=${JSON.stringify(permissions.approvalsReviewer)}`];
       return spawnSync(
         "codex",
-        ["exec", "--skip-git-repo-check", ...(opts.model ? ["--model", opts.model] : []), ...(opts.effort ? ["-c", `model_reasoning_effort=${JSON.stringify(opts.effort)}`] : []), "-"],
+        ["exec", "--skip-git-repo-check", ...permissionArgs, ...(opts.model ? ["--model", opts.model] : []), ...(opts.effort ? ["-c", `model_reasoning_effort=${JSON.stringify(opts.effort)}`] : []), "-"],
         spawnOpts(opts, {
           input: prompt + `\n\n(prompt also at ${file})\n`,
           stdio: ["pipe", "inherit", "inherit"],

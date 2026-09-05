@@ -1,6 +1,7 @@
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolvePermissionMode } from "./permissions.mjs";
 import {
   MEMORY_PREFIXES,
   archiveDir,
@@ -57,6 +58,7 @@ export function loadConfig() {
     runner: raw.runner || DEFAULT_CONFIG.runner,
     model: String(raw.model || "").trim(),
     effort: String(raw.effort || "").trim(),
+    permissionMode: resolvePermissionMode(raw.permissionMode),
     ...(raw.spec ? { spec: raw.spec } : {}),
     ...(raw.implementation ? { implementation: raw.implementation } : {}),
     ...(raw.scout ? { scout: raw.scout } : {}),

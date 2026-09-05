@@ -59,10 +59,11 @@ test("research uses the spec creator and hands its validated files to a differen
   RUNNERS.claude.which = () => process.execPath;
   const spec = { runner: "claude", model: "claude-fable-5-1", effort: "max" };
   const implementation = { runner: "codex", model: "gpt-5.6-sol", effort: "high" };
-  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-5.6-luna", effort: "low", spec, implementation },
+  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-5.6-luna", effort: "low", permissionMode: "ask", spec, implementation },
     probes: { ...defaultProbes(), claudeAuth: () => ({ loggedIn: true }), codexAuth: () => ({ loggedIn: true }) },
     run: async (runner, prompt, options) => {
       calls.push({ runner, model: options.model, effort: options.effort });
+      assert.equal(options.permissionMode, "ask");
       assert.match(prompt, new RegExp(`Runner: ${runner}`));
       if (options.phase === "implementation") assert.ok(existsSync(join(f.latest.specDir, "requirements.md")));
       return f.run(runner, prompt, options);

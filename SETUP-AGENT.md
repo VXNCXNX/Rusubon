@@ -82,6 +82,8 @@ In Runs, select an available scout model and one of its enabled effort options a
 
 Choose the investigation period, confirmed money paths, checks, and optional additional context. Inspect the UTC bounds and baseline shown by the form. Save setup to persist the selections, then reload and confirm they remain.
 
+In Setup, keep **Agent permissions → Auto** unless the user specifies another mode or has an existing explicit choice. Save and reload to verify it. See [Agent permissions](README.md#agent-permissions) for how Auto, Ask, and YOLO affect the dashboard and CLI.
+
 Research is optional. If requested, configure spec creator and implementation independently in Research, using the live options for each role, and save setup. Follow [Research-to-PR execution](docs/inbox-contract.md#research-to-pr-execution) for its additional prerequisites. Scout readiness does not establish research readiness.
 
 Run preflight from the product directory:
