@@ -71,8 +71,8 @@ export function mcpFromCloseOut(body) {
   return "ok";
 }
 
-export function summarizeRun({ skillName, startedAt, before, now = Date.now() }) {
-  const rel = closeOutRel(skillName);
+export function summarizeRun({ skillName, startedAt, before, now = Date.now(), closeOut }) {
+  const rel = closeOut || closeOutRel(skillName);
   const abs = join(cwd(), rel);
   const closeBody = existsSync(abs) ? readFileSync(abs, "utf8") : null;
   const after = snapshotState();

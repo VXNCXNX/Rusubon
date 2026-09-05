@@ -120,8 +120,11 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
 
 /** Run human-launched research, spec validation, implementation and draft publication.
  * Returns run metadata and a verdict; workflow failures preserve files and write a close-out. */
-export async function runPr({ raw, flags, config, probes = defaultProbes(), run = runWith }) {
-  assertPrReady(config, probes);
+export async function runPr({ raw, flags, config, probes = defaultProbes(), run = runWith, baseBranch, onEvent = () => {}, beforePublish = () => {} }) {
+  const researchConfig = { ...config, ...(config.spec || {}) };
+  const implementationConfig = { ...config, ...(config.implementation || {}) };
+  assertPrReady(researchConfig, probes);
+  assertPrReady(implementationConfig, probes);
   const source = resolveSource(parseSource(raw, flags), probes);
   const label = source.kind === "issue" ? formatIssueRef(source) : source.slug;
   const repo = cwd();
@@ -130,8 +133,9 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   }
   if (git(repo, ["status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none"])) throw new Error("rusubon pr needs a clean checkout; keep existing changes in a separate worktree or commit them first");
   assertWorktreeMatchesHead(repo);
-  const base = git(repo, ["branch", "--show-current"]);
-  if (!base) throw new Error("rusubon pr needs a named base branch");
+  const startBranch = git(repo, ["branch", "--show-current"]);
+  const base = baseBranch || startBranch;
+  if (!base || !startBranch) throw new Error("rusubon pr needs a named base branch");
   const head = git(repo, ["rev-parse", "HEAD"]);
   const remoteHead = git(repo, ["ls-remote", "--exit-code", "origin", `refs/heads/${base}`]).split(/\s/)[0];
   if (remoteHead !== head) throw new Error("base branch must match origin before rusubon pr; unpublished base commits would enter the PR");
@@ -146,6 +150,7 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   const specPath = `docs/plans/${new Date().toISOString().slice(0, 10)}-${slug}-${runId}`;
   const specDir = localPath(repo, specPath);
   const closeOut = join(runDir, "close-out.md");
+  onEvent({ type: "artifacts", closeOut, specPath });
   /** Write the redacted close-out and return the run outcome. */
   const finish = (verdict, reason, url) => {
     writeFileSync(closeOut, redact(`# Research ${label}\n\nRun: ${runId}\nVerdict: ${verdict}\n\n${reason}\n\nSpec: ${specPath}\n${url ? `\nDraft PR: ${url}\n` : ""}`));
@@ -154,12 +159,14 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   };
   /** Dispatch one runner phase and require a result belonging to this run. */
   const phase = async (name) => {
-    const prompt = buildPrPrompt(source, config, { phase: name, runId, runDir: relative(repo, runDir), specPath });
+    const phaseConfig = name === "research" ? researchConfig : implementationConfig;
+    const prompt = buildPrPrompt(source, phaseConfig, { phase: name, runId, runDir: relative(repo, runDir), specPath });
     writeFileSync(join(runDir, `${name}-prompt.md`), prompt);
     console.log(`${name}  ${label}  run=${runId}`);
+    onEvent({ type: "phase", name, status: "running" });
     let result, parsed, resultError;
     try {
-      result = await run(config.runner, prompt, { phase: name, timeoutMs: 30 * 60 * 1000 });
+      result = await run(phaseConfig.runner, prompt, { phase: name, model: phaseConfig.model || undefined, effort: phaseConfig.effort || undefined, timeoutMs: 30 * 60 * 1000 });
     } finally {
       // Failed or interrupted runners may still have written sensitive artifacts.
       try { parsed = readResult(join(runDir, `${name}.json`), runId, label, name); }
@@ -167,16 +174,19 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     }
     if (result.status !== 0 || result.timedOut) throw new Error(`${name} runner ${result.timedOut ? "timed out" : `exited ${result.status}`}`);
     if (resultError) throw resultError;
+    onEvent({ type: "phase", name, status: "completed" });
     return parsed;
   };
   try {
     const research = await phase("research");
-    assertHead(repo, head, base);
+    assertHead(repo, head, startBranch);
     const planned = snapshot(repo);
     const outsidePlan = changedFiles(before, planned).filter((path) => !path.startsWith(`${specPath}/`));
     if (outsidePlan.length) throw new Error(`research modified files before the spec gate: ${outsidePlan.join(", ")}`);
     if (research.verdict !== "immediately_actionable") return finish(research.verdict, research.reason);
+    onEvent({ type: "phase", name: "Spec validation", status: "running" });
     validateSpec(repo, specDir);
+    onEvent({ type: "phase", name: "Spec validation", status: "completed" });
     const state = JSON.parse(readFileSync(join(specDir, ".spec-state.json"), "utf8"));
     for (const name of specFiles(state.type)) {
       if (!Object.hasOwn(planned.files, `${specPath}/${name}`)) throw new Error("spec files must not be ignored; the draft PR must include the validated plan");
@@ -202,9 +212,14 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     const outsideScope = changedFiles(planned, implemented).filter((path) => !allowed.has(path));
     if (outsideScope.length) throw new Error(`implementation changed undeclared files: ${outsideScope.join(", ")}`);
     if (!files.some((path) => !path.startsWith(`${specPath}/`))) throw new Error("implementation made no product change");
+    onEvent({ type: "phase", name: "Verification", status: "running" });
     const receipt = verifyImplementation({ repo, specDir, runDir, runId, source: label });
+    onEvent({ type: "phase", name: "Verification", status: "completed" });
     assertHead(repo, head, branch);
+    await beforePublish();
+    onEvent({ type: "phase", name: "Draft PR", status: "running" });
     const url = publish({ repo, specDir, runDir, receipt, result: implementation, branch, base, files });
+    onEvent({ type: "phase", name: "Draft PR", status: "completed", url });
     return finish("immediately_actionable", implementation.reason, url);
   } catch (error) {
     const message = redact(error instanceof Error ? error.message : error);

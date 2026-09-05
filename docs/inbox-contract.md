@@ -1,6 +1,72 @@
 # Inbox contract (files)
 
-Rusubon copies PostHog Inbox as a file tree in the **product** repo. No UI. Trigger is a command you run. Official PostHog MCP only — Rusubon never calls the PostHog HTTP API.
+Rusubon copies PostHog Inbox as a file tree in the **product** repo. A person launches work from the CLI or the local dashboard. Official PostHog MCP only. Rusubon never calls the PostHog HTTP API.
+
+## Dashboard execution
+
+`rusubon ui` serves one repository on loopback with a session token. The
+dashboard reads the same inbox and context files as the CLI. Saving confirmed
+context is a human action; agent context drafts always retain the placeholder.
+Setup writes require the revision of both files shown in the form. Stale
+submissions fail before writing, including a second check in the worker.
+
+The dashboard uses Claude Code through its Agent SDK or Codex through stdio
+app-server. Scout, spec creator, and implementation have independent runner,
+model, and effort selections. Choices must belong to both the role's product
+allowlist and the connected runner's live catalog. The original six models are
+available to all three roles. Fable 5.1 is opt-in for research/spec creation only;
+Fable 5 remains excluded. An
+unavailable model fails before inference, with no alias or automatic fallback.
+Both PR phase selections are immutable run metadata, including on a rerun.
+The research phase uses the spec creator; implementation reads the validated
+spec in a separate agent phase with its own selection. Claude session review
+uses the saved read model at `low` effort.
+
+Dashboard scouts require an explicit investigation scope: PostHog project and
+region, complete UTC days, confirmed money paths, enabled checks, and optional
+additional context. Relative periods are 7, 14, or 30 days; custom periods are
+1 to 90 days with an inclusive end date in the UI. The runner uses an exclusive
+end timestamp. The previous period has equal duration. Diagnostic history for
+recording coverage and existing replay analysis starts at least 30 days before
+the end, or two periods for longer windows. It is disclosed before launch.
+Current findings and session qualification may not use that older history.
+
+The server resolves the scope against the displayed Setup revision and the
+worker rechecks it under the job lock. The run saves `scout-scope.json`, including
+the confirmed context, and passes the same snapshot to SQL and session review.
+Enabled checks select the query templates: clicks, errors and recorded failures,
+recording coverage, and existing replay analysis. Optional missing tools or
+tables are limitations, not permission to widen scope. Candidate JSON must
+carry the scope ID, session IDs, selected paths, in-period timestamps, and
+enabled signal types. Invalid candidates fail before phase 2. Only the parent
+writes findings, and reports include the source and query boundaries.
+
+Runs remembers investigation choices locally; Save setup persists them under
+`scout` in `rusubon.json`. The CLI honors saved scope defaults. Configurations
+without `scout` keep the legacy behavior. Scoped reruns require review of the
+loaded choices: presets resolve fresh dates, custom dates remain fixed.
+Spec and implementation controls live in Research, independently of scouting.
+
+Dashboard runs have unique `.rusubon/runs/ui-<uuid>/` directories containing
+`job.json`, `events.jsonl`, prompts, and close-outs. A writable job holds the same
+repository lock used by CLI scouts, context drafts, and PR runs. A second
+dashboard for the same repository is refused. Closing the browser leaves work
+running; stopping the server terminates workers and their descendant processes.
+Interrupted runs preserve their files and require a fresh launch.
+Context drafts also keep a durable `.rusubon/runs/context-draft.json` guard.
+CLI and dashboard scouting refuse while it exists. After the draft process
+group stops, supervisor recovery re-seals the context before removing the guard.
+
+Permission requests, questions, and MCP authorization forms are presented to the
+human. Logs and displayed artifacts redact recognized credentials. Report
+markdown is sanitized before rendering, and dashboard file access rejects
+symlinks and paths outside its workspace.
+
+Friction only writes findings. The human's Research & create draft PR action
+prepares a separate worktree from committed HEAD and invokes the existing
+Research-to-PR execution contract below. Its base must match origin. Publishing
+still belongs to the harness, creates a draft, and opens it for review. Failed
+worktrees are preserved.
 
 ## Layout
 

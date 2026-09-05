@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark"><title>Rusubon</title>
+  <link rel="icon" href="data:,"><link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="seal" aria-hidden="true">留</span> rusubon</div>
+      <nav aria-label="Workspace">
+        <button type="button" data-static data-page="runs" aria-current="page"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg> Runs</button>
+        <button type="button" data-static data-page="findings"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="3" width="12" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h3"/></svg> Findings <span id="finding-count" class="count"></span></button>
+        <button type="button" data-static data-page="research"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4v12M14 4v4a4 4 0 0 1-4 4H6"/><circle cx="6" cy="4" r="2"/><circle cx="14" cy="4" r="2"/><circle cx="6" cy="16" r="2"/></svg> Research</button>
+        <button type="button" data-static data-page="setup"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 14h12"/><circle cx="8" cy="6" r="2" fill="var(--side)"/><circle cx="12" cy="14" r="2" fill="var(--side)"/></svg> Setup</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="local-dot"></span> On your machine.<br><span class="footnote">Works with PostHog.</span></div>
+    </aside>
+    <div class="workspace">
+      <header class="top"><div class="breadcrumb"><span id="repo-name">Workspace</span><span class="muted">/</span><span id="page-label">Runs</span></div><span id="stream-status" class="muted small stream" role="status"><span class="icon-swap" id="stream-icon" data-complete="false" aria-hidden="true"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 10 3 3 7-7"/></svg></span><span id="stream-label">Connecting…</span></span></header>
+      <main id="content" tabindex="-1">
+        <div id="notice" class="notice" role="status" hidden></div>
+        <section id="page-runs" aria-labelledby="runs-title">
+          <div class="heading"><div><div class="eyebrow">Your product, looked after</div><h1 id="runs-title">A little less guesswork.</h1><p>Find where people struggle. Decide what deserves a fix.</p></div></div>
+          <div class="launch panel">
+            <div class="row"><div><h2>Friction scout</h2><p class="caption">Evidence from events. Context from your product.</p></div><span id="readiness" class="badge">Checking setup</span></div>
+            <div id="scout-scope-controls"></div>
+            <div class="scout-agent"><div id="model-controls" class="model-controls"></div></div>
+            <p id="model-help" class="caption"></p>
+            <p id="scope-error" class="caption scope-error" role="status" hidden></p>
+            <div class="launch-bottom row"><div><p id="launch-summary" class="launch-summary" role="status"></p><span id="launch-help" class="caption"></span></div><button id="launch-scout" type="button" class="button primary" disabled>Launch scout <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M5 5h10v10"/></svg></button></div>
+          </div>
+          <div class="section-title"><h2>Recent runs</h2><span class="caption">Saved in this repository</span></div>
+          <div id="run-list"></div>
+
+        </section>
+        <section id="page-findings" hidden aria-labelledby="findings-title">
+          <div class="heading"><div><div class="eyebrow">The inbox</div><h1 id="findings-title">Evidence before action.</h1><p>Quantified findings, ready for a human decision.</p></div></div>
+          <div class="tabs" role="group" aria-label="Finding status"><button class="button" data-static data-filter="open" aria-pressed="true">Open</button><button class="button" data-static data-filter="archived" aria-pressed="false">Archived</button></div>
+          <div id="finding-list"></div>
+          <div id="report-detail" hidden></div>
+        </section>
+        <section id="page-research" hidden aria-labelledby="research-title">
+          <div class="heading"><div><div class="eyebrow">From evidence to implementation</div><h1 id="research-title">A considered fix.</h1><p>Research a finding, write a spec, and build a verified draft PR.</p></div></div>
+          <div class="panel agent-roles">
+            <div class="row"><h2>Research & draft PR</h2><span class="badge">You choose when to launch</span></div>
+            <fieldset class="role-fieldset"><legend>Spec creator</legend><p class="caption" id="spec-help"></p><div id="spec-model-controls" class="model-controls"></div></fieldset>
+            <fieldset class="role-fieldset"><legend>Implementation</legend><p class="caption">Builds from the validated spec. Its model and effort are independent of the scout and spec creator.</p><div id="implementation-model-controls" class="model-controls"></div></fieldset>
+            <div class="launch-bottom row"><span class="caption" id="pr-readiness"></span><button type="button" class="text-button" data-page="setup">Save defaults in Setup</button></div>
+          </div>
+          <div class="section-title"><h2>Start from evidence</h2><button class="button" type="button" data-page="findings">Choose a finding</button></div>
+          <p class="caption">Open a finding and choose Research & create draft PR. The agents above are used for that run.</p>
+          <details class="issue-launch"><summary>Start from a GitHub issue</summary><p class="caption">Research, build, and verify in a separate worktree from committed HEAD. A successful run opens a draft PR for review.</p><form id="issue-form" class="inline-form"><label class="grow">Issue number or URL<input name="issue" placeholder="#42" required autocomplete="off"></label><button class="button" id="launch-issue" type="submit">Research & create draft PR</button></form></details>
+        </section>
+        <section id="page-setup" hidden aria-labelledby="setup-title">
+          <div class="heading"><div><div class="eyebrow">Make yourself at home</div><h1 id="setup-title">A good scout starts here.</h1><p>Connect your agent and tell it what matters.</p></div></div>
+          <div class="repo-strip"><span class="caption">Repository</span><code id="repo-path"></code></div>
+          <div class="section-title"><h2>Agent connections</h2><button class="text-button" id="refresh-connections" type="button">Refresh connections</button></div>
+          <div id="connections" class="connection-grid"></div>
+          <form id="setup-form" class="panel setup-form">
+            <div id="setup-conflict" class="notice" role="status" hidden><p>Setup changed on disk. Your edits are kept. Review the current files before saving.</p><div class="actions"><button type="button" class="text-button" id="view-current-setup">View current setup</button><button type="button" class="text-button" id="load-current-setup">Replace form with current setup</button></div></div>
+            <div class="row"><h2>Product context</h2><span id="context-status" class="badge">Not confirmed</span></div>
+            <p class="caption">Kept in rusubon.json and .rusubon/context.md, beside your code.</p>
+            <div class="form-grid">
+              <label>PostHog project ID<input id="project-id" name="projectId" inputmode="numeric" pattern="[0-9]+" placeholder="12345" required></label>
+              <label>PostHog region<select name="host" id="posthog-host" required><option value="">Choose a region</option><option value="eu">EU</option><option value="us">US</option></select></label>
+              <label class="full">Product, money paths, intentional friction, and out of scope<textarea id="product-context" name="context" rows="16" spellcheck="false" required></textarea></label>
+              <label class="checkbox full"><input type="checkbox" id="context-confirmed" name="confirmed"><span>I have reviewed the money paths and intentional friction. This context is ready for scouting.</span></label>
+              <label>Claude session-review model<select id="read-model" name="readModel"><option value="claude-sonnet-5">Sonnet 5</option><option value="claude-opus-5">Opus 5</option></select></label><div class="field-note">Session review always uses <code>low</code> effort.<br>Codex scouts use SQL analysis only.</div>
+            </div>
+            <div class="row"><span class="caption" id="saved-selection"></span><button class="button primary" type="submit" id="save-setup">Save setup</button></div>
+          </form>
+          <details class="draft-context"><summary>Have your agent propose the context</summary><p class="caption">Save setup first. The selected model drafts context at low effort for you to review. Your confirmation is still required.</p><form id="context-form"><label>What does this product do?<textarea name="about" rows="3" placeholder="Who uses it, and what should they be able to do?"></textarea></label><button id="draft-context" type="submit" class="button">Draft product context</button></form></details>
+        </section>
+        <section id="page-job" hidden aria-labelledby="job-title"><div id="job-detail"></div><div id="requests"></div><div id="job-activity"></div><div id="job-artifacts"></div></section>
+      </main>
+    </div>
+  </div>
+  <dialog id="artifact-dialog" aria-labelledby="artifact-title"><div class="row"><h2 id="artifact-title">Run artifact</h2><button type="button" class="button" id="close-artifact">Close</button></div><div id="artifact-body" class="prose"></div></dialog>
+</body>
+</html>

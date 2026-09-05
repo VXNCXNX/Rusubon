@@ -80,7 +80,7 @@ ${DRAFT_PLACEHOLDER_LINE}
 Then Write the file. Stop.`;
 }
 
-export function draftContext(opts = {}) {
+export async function draftContext(opts = {}) {
   const config = opts.config || loadConfig();
   const force = Boolean(opts.force);
   const about = String(opts.about || "").trim();
@@ -90,7 +90,9 @@ export function draftContext(opts = {}) {
 
   mkdirSync(rusubonDir(), { recursive: true });
   const prompt = buildDraftPrompt(config, about);
-  const result = runWith(config.runner, prompt, { effort: "low" });
+  let result;
+  try { result = await (opts.run || runWith)(config.runner, prompt, { model: config.model || undefined, effort: "low" }); }
+  finally { if (existsSync(path)) writeFileSync(path, sealDraft(readFileSync(path, "utf8"))); }
   if (result.status !== 0) {
     throw new Error(`${config.runner} exited ${result.status} (context draft)`);
   }

@@ -1,7 +1,8 @@
 import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { PLACEHOLDER_HOST, PLACEHOLDER_PROJECT, resolveHost } from "./config.mjs";
-import { PLACEHOLDER, loadContext } from "./context.mjs";
+import { PLACEHOLDER, loadContext, contextDraftPending } from "./context.mjs";
 import { RUNNERS } from "./runners.mjs";
 
 function which(bin) {
@@ -50,6 +51,13 @@ export function defaultProbes() {
     agentMcpList() {
       const bin = which("agent") || "agent";
       return runCmd(bin, ["mcp", "list"]).out;
+    },
+    codexAuth() {
+      const result = runCmd("codex", ["login", "status"]);
+      return { loggedIn: result.status === 0 && /logged in/i.test(result.out) && !/not logged in/i.test(result.out) };
+    },
+    codexMcpList() {
+      return runCmd(process.execPath, [fileURLToPath(new URL("./ui/doctor-probe.mjs", import.meta.url))]).out;
     },
     ghAuth() {
       return runCmd("gh", ["auth", "status"]);
@@ -110,6 +118,7 @@ function checkHost(config) {
 
 function checkContext() {
   try {
+    if (contextDraftPending()) throw new Error("Context draft recovery is pending. Open rusubon ui, then review and confirm the recovered context.");
     const { body } = loadContext();
     if (body.includes(PLACEHOLDER)) {
       return {
@@ -168,22 +177,20 @@ function checkAuth(config, probes) {
     return { name: "auth", ok: false, detail: "cursor agent not logged in. run `agent login`" };
   }
   if (name === "codex") {
-    return { name: "auth", ok: true, detail: "codex on PATH (login is the CLI's)" };
+    const ok = Boolean(probes.codexAuth?.().loggedIn);
+    return { name: "auth", ok, detail: ok ? "codex logged in" : "codex not logged in. run `codex login`" };
   }
   return { name: "auth", ok: false, detail: `unknown runner '${name}'` };
 }
 
 export function posthogMcpOk(text) {
   const lines = String(text || "").split(/\r?\n/);
-  const hit = lines.find((l) => /posthog/i.test(l));
-  if (!hit) return false;
-  if (/fail|error|✗|×/i.test(hit) && !/connected/i.test(hit)) return false;
-  return /connected|✔/i.test(hit);
+  return lines.some(line => /posthog/i.test(line) && !/not connected|disconnected|fail|error|pending|disabled|✗|×/i.test(line) && /\bconnected\b|✔/i.test(line));
 }
 
 function checkMcp(config, probes) {
   const name = config?.runner || "claude";
-  const text = name === "cursor" ? probes.agentMcpList() : probes.claudeMcpList();
+  const text = name === "cursor" ? probes.agentMcpList() : name === "codex" ? probes.codexMcpList?.() || "" : probes.claudeMcpList();
   if (posthogMcpOk(text)) {
     return { name: "mcp", ok: true, detail: "posthog connected" };
   }

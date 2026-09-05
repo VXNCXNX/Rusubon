@@ -8,10 +8,13 @@ import { remember } from "./memory.mjs";
 import { runPr } from "./pr.mjs";
 import { listSkills, runSkill } from "./run.mjs";
 import { RUNNERS } from "./runners.mjs";
+import { withRepoLock } from "./lock.mjs";
 
 const HELP = `Rusubon — 留守番 — product scouts for PostHog, on your own agent.
 
 Usage:
+  rusubon ui [--repo path] [--port 0] [--no-open]
+                                       open the local agent dashboard
   rusubon init                         scaffold .rusubon/ + ${CONFIG_NAME}
   rusubon context draft [--about "…"] [--force]
                                        propose context.md (placeholder stays)
@@ -45,8 +48,18 @@ function doctorCommand() {
 export async function main(argv) {
   const [cmd, ...rest] = argv;
   switch (cmd) {
+    case "ui": {
+      const noOpen = takeFlag(rest, "no-open");
+      const repo = takeOption(noOpen.rest, "repo");
+      const port = takeOption(repo.rest, "port");
+      if (port.rest.length || (port.value !== undefined && !/^\d+$/.test(port.value))) throw new Error("usage: rusubon ui [--repo path] [--port 0] [--no-open]");
+      const number = Number(port.value || 0);
+      if (!Number.isInteger(number) || number < 0 || number > 65535) throw new Error("Port must be between 0 and 65535");
+      const { uiCommand } = await import("./ui/server.mjs");
+      return uiCommand({ repo: repo.value || process.cwd(), port: number, open: !noOpen.present });
+    }
     case "init":
-      return initConfig();
+      return withRepoLock(process.cwd(), () => initConfig());
     case "context": {
       if (rest[0] !== "draft") {
         throw new Error('usage: rusubon context draft [--about "…"] [--force]');
@@ -55,7 +68,7 @@ export async function main(argv) {
       const aboutOpt = takeOption(force.rest, "about");
       let about = (aboutOpt.value || aboutOpt.rest.join(" ")).trim();
       if (!about) about = (await readStdin()).trim();
-      return draftContext({ about, force: force.present });
+      return withRepoLock(process.cwd(), () => draftContext({ about, force: force.present }));
     }
     case "doctor":
       return doctorCommand();
@@ -66,7 +79,7 @@ export async function main(argv) {
         throw new Error("research is not a scout. launch it with `rusubon pr <slug|issue>`");
       }
       const config = loadConfig();
-      return runSkill(skill, config);
+      return withRepoLock(process.cwd(), () => runSkill(skill, config));
     }
     case "pr": {
       const issue = takeFlag(rest, "issue");
@@ -74,11 +87,11 @@ export async function main(argv) {
       const raw = report.rest[0];
       if (!raw) throw new Error("usage: rusubon pr <slug|#N|url> [--issue|--report]");
       const config = loadConfig();
-      return runPr({
+      return withRepoLock(process.cwd(), () => runPr({
         raw,
         flags: { issue: issue.present, report: report.present },
         config,
-      });
+      }));
     }
     case "remember": {
       const key = rest[0];
@@ -95,9 +108,10 @@ export async function main(argv) {
       if (!slug || !parsed.value) {
         throw new Error('usage: rusubon decline <slug> --why "…"');
       }
-      const result = decline(slug, parsed.value);
-      console.log(`archived ${result.slug}; wrote .rusubon/memory/noise/${result.slug}.md`);
-      return;
+      return withRepoLock(process.cwd(), () => {
+        const result = decline(slug, parsed.value);
+        console.log(`archived ${result.slug}; wrote .rusubon/memory/noise/${result.slug}.md`);
+      });
     }
     case "inbox":
       return printInbox(listInbox());

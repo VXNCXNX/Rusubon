@@ -5,25 +5,196 @@
 PostHog already recorded the sessions. You already pay for Claude, Cursor, or Codex.
 Rusubon runs a scout on that login, through official PostHog MCP, and writes friction findings as markdown in your product repo.
 
-A finding is a file: a path, a step that broke vs that path's baseline, enough people that it isn't one angry session. You `show` it. You `decline --why` when it's noise or a gate you meant to have. Next run can skip it. Friction never opens a PR or a GitHub issue. A human can launch `rusubon pr` after a report.
+Early preview, version 0.1.0. Install from source below. The dashboard supports Claude Code and Codex; Cursor is CLI-only. See the [changelog](CHANGELOG.md) for release status.
 
-`rusubon init` in the **product** repo (not this package). Then `rusubon run friction`.
-`doctor` refuses if `.rusubon/context.md` is still a placeholder, the runner isn't logged in, or PostHog MCP is missing.
+**Choose what to investigate, then launch with one click. Follow the evidence and your agent's progress in one place.**
 
-Contract: [docs/inbox-contract.md](docs/inbox-contract.md).
+![Rusubon scout launch with a PostHog project, date range, money paths, selectable checks, additional context, and compact agent controls.](docs/images/dashboard-launch.jpg)
 
-## Install
+*Screenshots use a demo workspace with illustrative data.*
 
-Use macOS, Linux, or Windows through WSL. Native Windows timed subprocesses
-are rejected before launch because supervision requires POSIX process groups.
+## Start your dashboard
+
+You need Node.js 22.12 or newer, npm, Git, and an installed Claude Code or
+Codex CLI available in your terminal. Use macOS, Linux, or Windows through WSL.
+Your PostHog Cloud project must already receive product events. Recording and
+replay checks also need the corresponding data in PostHog.
+
+Install Rusubon once from this repository:
 
 ```bash
 git clone https://github.com/VXNCXNX/rusubon.git
 cd rusubon
+npm ci
 npm link
 ```
 
-In the product repo:
+Open the dashboard for the **product repository you want to investigate**.
+Replace the example path with the actual folder containing your product's code:
+
+```bash
+rusubon ui --repo /absolute/path/to/your-product
+```
+
+A local browser page opens. Keep this terminal running. There is no frontend
+build, separate web server, or hosted Rusubon account to set up.
+
+1. Open **Setup**. Sign in to Claude Code or Codex if needed, then choose **Connect PostHog** for that runner and complete authorization in your browser.
+2. Enter your PostHog project ID and US or EU region. Add product context, including actual URLs or paths under `# Money paths`, intentional friction, and exclusions. Confirm the context and click **Save setup**. This initializes Rusubon's files in your product repository.
+3. Open **Runs**. Choose the period, money paths, checks, and any additional context. Select your agent, model, and effort, then click **Launch scout**.
+4. Follow progress and answer agent questions on the run page. Open **Findings** to review the evidence. **Research** holds the separate spec creator and implementation settings for a human-launched draft PR.
+
+Next time, open a terminal in that product repository and run:
+
+```bash
+rusubon ui
+```
+
+The default port is chosen automatically. The command prints the exact URL to
+open if the browser does not appear. Closing the browser leaves a run active;
+**Stop run** stops that run, and Ctrl-C in the terminal stops the dashboard and
+its active workers. Your setup, findings, and run history remain on disk.
+
+### If you get stuck
+
+| Symptom | What to do |
+| --- | --- |
+| `rusubon: command not found`, or `npm link` cannot write to the global bin directory | Use `node /absolute/path/to/rusubon/bin/rusubon.mjs ui --repo /absolute/path/to/your-product`. Keep the Rusubon clone and its installed dependencies. |
+| The wrong repository appears | Stop the dashboard and restart with `--repo` pointing to your product's code. The repository path is shown in Setup. |
+| The browser did not open, or an old tab says it is disconnected | Open the full URL printed by the currently running command, including its token fragment. A restart creates a new URL token. |
+| A runner is missing or cannot sign in | Check that `claude` or `codex` works in the terminal that launches Rusubon. Install or sign in to that CLI, then refresh connections in Setup. |
+| Launch scout is disabled | Read the message beside the button. Confirm context, choose at least one money path and check, connect PostHog, and select an available model and effort. |
+| No findings appear | Read the run's close-out. Missing optional data and evidence below the filing threshold can produce no findings. |
+
+For a fixed local address, use `rusubon ui --port 4242`. For another product,
+start another dashboard with its own `--repo`; each repository has its own setup
+and history. Only one dashboard can own a given repository at a time.
+
+## Local dashboard
+
+```bash
+rusubon ui                              # current product repo, opens your browser
+rusubon ui --repo /path/to/product      # select a product repo
+rusubon ui --port 4242 --no-open         # print the URL without opening it
+```
+
+**Follow each phase and answer your agent's questions directly in the dashboard.**
+
+![A scout run showing its saved investigation scope, phase progress, a product question, and live agent activity.](docs/images/dashboard-monitor.jpg)
+
+The dashboard binds to `127.0.0.1`. Use the full URL printed by the command. Its
+fragment contains the session token, which the browser keeps in session storage.
+Keep the terminal running while you use the dashboard.
+
+In Setup, sign in to Claude Code or Codex with the installed CLI. Connect the
+official PostHog MCP on each runner you want to use. Authorization opens in your
+browser. Credentials stay in the runner's configuration. Rusubon does not ask
+you to paste an API key into the dashboard. Existing API-key environments still
+use their configured billing, shown on the connection card.
+
+Set the PostHog project ID and region, then edit product context. Check the
+confirmation box only after reviewing money paths and intentional friction.
+You can save an unconfirmed draft and have the agent propose context. The
+placeholder stays until you confirm and save it.
+
+Setup saves compare the revision of both configuration and context files. If
+either changed while the form was open, your edits stay in the form and the
+save is refused. View the current setup, then load it and reconcile your edits.
+
+In Runs, choose the PostHog project in Setup, then set the investigation:
+
+| Choice | What it controls |
+| --- | --- |
+| Period | Last 7, 14, or 30 complete UTC days, or custom dates up to 90 days. The previous period has the same duration. Today is excluded. |
+| Focus | All confirmed money paths or a subset. Put URLs or paths such as `/checkout` under `# Money paths` in product context. Descendants, `:id` segments, and explicit `*` segments are supported. |
+| What to inspect | Rage/dead clicks, errors/failed requests, recording coverage, and existing replay analysis. At least one check is required. |
+| Additional context | A note for this run, such as a recent release or behavior to investigate. Confirmed intentional friction and exclusions still apply. |
+
+Click checks query `$rageclick` and `$dead_click` events. Error checks use
+`$exception` events and recorded failure counters. Coverage compares pageviews
+with recording metadata. Existing replay analysis reads `$recording_observed`
+signals and available stored summaries; it never creates scanners or summaries.
+All checks use traffic for context. Missing optional evidence is recorded as a
+limitation. Coverage and replay checks may read at least 30 days of diagnostic
+history, shown before launch. Findings and session candidates stay within the
+chosen period and focus.
+
+The project, UTC bounds, paths, checks, and confirmed context are saved in
+`scout-scope.json` and shown on the run. Both phases receive that snapshot.
+The harness rejects candidates with a different scope ID, dates outside the
+period, unrelated paths, or disabled signals before session review. Review &
+rerun loads the previous choices for inspection; relative dates move forward,
+while custom dates stay fixed. The browser remembers your choices. Save setup
+to persist them in `rusubon.json` under `scout`, which the CLI also honors.
+CLI configurations without `scout` retain the existing scout defaults.
+
+Choose the scout's agent, model, and effort in Runs. Research has independent
+controls for the spec creator and implementation. Save setup to persist all
+three agent defaults.
+The spec creator handles research, requirements, design, and tasks. It defaults
+to GPT-5.6 Sol at `high` effort. Implementation starts a separate agent phase
+from the validated spec, using its own selection. The installed runner's live
+catalog must support the selection before a phase can start. The dashboard's
+allowlist is deliberately small:
+
+| Agent | Model | Allowed effort levels |
+| --- | --- | --- |
+| Claude Code | Sonnet 5 | `low`, `medium`, `high`, `xhigh`, `max` |
+| Claude Code | Opus 5 | `low`, `medium`, `high`, `xhigh`, `max` |
+| Claude Code | Fable 5.1, spec creator only | `low`, `medium`, `high`, `xhigh`, `max` |
+| Codex | GPT-5.6 Luna | `low`, `medium`, `high`, `xhigh`, `max` |
+| Codex | GPT-5.6 Terra | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| Codex | GPT-5.6 Sol | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| Codex | GPT-6 Astra | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+
+Live capabilities can narrow these choices. `ultra` is a mode of the connected
+Codex runner that enables automatic delegation, not a portable API effort
+value. Fable 5.1 (`claude-fable-5-1`) is opt-in for research/spec creation only;
+it is excluded from scouting, session review, and implementation. Fable 5 stays
+excluded. Each PR run records both phase selections and reuses them on Run again.
+Reported Claude model switches and effort mismatches stop the phase. Runtime
+hooks verify applied effort when the initial message omits it; a phase without
+effective model and effort evidence is not accepted as successful.
+Claude's session-review phase uses the separately saved Sonnet 5 or
+Opus 5 model at `low`; Codex scouts stop after SQL analysis.
+
+In `rusubon.json`, the top-level `runner`, `model`, and `effort` configure the
+scout. The `spec` and `implementation` objects each accept their own `runner`,
+`model`, and `effort`. The CLI PR workflow honors both objects. Existing CLI
+configurations without these objects keep using the top-level selection.
+
+Follow phases, agent messages, tool activity, usage, and saved artifacts from a
+run's page. Answer permission prompts and agent questions there. Refreshing or
+closing the browser does not stop the run. Stop run, or Ctrl-C in the dashboard
+terminal, stops its processes and preserves partial files. After an interrupted
+server restart, the history marks unfinished runs as failed. Run again starts a
+fresh run; it does not resume the old agent session. One writable operation can
+run per repository, shared with CLI scouts and PR workflows.
+
+A durable guard blocks scouting during context drafting and after a dashboard
+crash. The supervisor waits for the draft's processes to stop, restores the
+review placeholder, then clears the guard. Recovered drafts require human review.
+
+Findings displays the report's evidence and HogQL. Decline archives a finding
+and saves your reason to memory. Research & create draft PR explicitly launches
+the existing research, spec, implementation, verification, and publishing flow.
+It creates a worktree under `~/.rusubon/worktrees/` from the current committed
+HEAD. That base must match origin, and the Rusubon ignore rules must be committed.
+Uncommitted edits in your original checkout stay there. Successful publishing
+opens the draft PR for review. Failed worktrees and their artifacts stay available.
+
+The frontend uses local static assets with no build step. Its Node server talks
+to the installed Claude Code CLI through the Claude Agent SDK and to Codex
+through its stdio app-server protocol. It does not require an ACP bridge.
+
+## Use the CLI directly
+
+A finding is a file containing the affected path, a quantified change, and
+supporting queries. Review it with `show`, or archive noise with `decline --why`
+so future scouts can use that decision. Friction never opens a PR or a GitHub
+issue. A person can launch `rusubon pr` after reviewing a report.
+
+If you prefer terminal setup, run this inside your product repository:
 
 ```bash
 rusubon init
@@ -72,6 +243,8 @@ rusubon.json                       # committed: projectId + host (us|eu) + runne
 .rusubon/runs/*.md                 # gitignored: close-outs
 .rusubon/runs/*-friction-candidates.json # gitignored: phase-two session candidates
 .rusubon/runs/<run-id>/            # gitignored: PR prompts, results, logs, receipt and close-out
+.rusubon/runs/ui-<uuid>/           # gitignored: dashboard job, events, scout artifacts
+.rusubon/runs/*.lock              # gitignored: local dashboard and workflow ownership
 ```
 
 ## Config
@@ -154,7 +327,7 @@ fresh run, commit the work you want to keep or use a clean worktree.
 
 - A PostHog Cloud feature, or a fork you self-host
 - A standing Replay Vision / Gemini scanner
-- An Inbox UI or an auto-PR. No cron. No auto-merge. Not the PostHog wizard.
+- An unattended PR publisher. A person launches each research-to-PR run. No cron or auto-merge.
 - A hosted AI reseller
 
 ## License

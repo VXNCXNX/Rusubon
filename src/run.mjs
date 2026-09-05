@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
 import {
   READ_BATCH,
   READ_MAX_MS,
@@ -9,6 +10,7 @@ import {
   closeOutBody,
   loadCandidates,
   shouldRunPhase2,
+  scopedCandidates,
 } from "./candidates.mjs";
 import { pkgRoot } from "./config.mjs";
 import { assertReady } from "./doctor.mjs";
@@ -18,6 +20,8 @@ import { formatIndex } from "./memory.mjs";
 import { cwd, runsDir } from "./paths.mjs";
 import { runWith } from "./runners.mjs";
 import { formatRunSummary, snapshotState, summarizeRun } from "./summary.mjs";
+import { resolveScoutScope } from "./scout-scope.mjs";
+import { scopedPrompt } from "./scout-prompt.mjs";
 
 export function skillsDir() {
   return resolve(pkgRoot(), "skills");
@@ -41,9 +45,10 @@ export function buildPrompt(skill, config, extras = {}) {
   const phase = extras.phase || 1;
   const { body: context } = loadContext();
   const today = new Date().toISOString().slice(0, 10);
-  const runFile = `.rusubon/runs/${today}-${skill.name}.md`;
-  const candRel = candidatesRel(skill.name);
+  const runFile = extras.files?.closeOut || `.rusubon/runs/${today}-${skill.name}.md`;
+  const candRel = extras.files?.candidates || candidatesRel(skill.name);
   const index = formatIndex(skill.name);
+  if (extras.scope) return scopedPrompt({ scope: extras.scope, phase, runner: config.runner, memory: index, candidates: extras.candidates, closeOut: runFile, candidatesFile: candRel, reportTemplate: resolve(pkgRoot(), "templates", "report.md"), cursorKey: SESSION_CURSOR_KEY });
   const skillRoot = join(skillsDir(), skill.name);
   const hogqlPath = join(skillRoot, "references", "hogql.md");
   const hogql = existsSync(hogqlPath) ? readFileSync(hogqlPath, "utf8") : "";
@@ -103,7 +108,7 @@ ${hogql ? `\n# HogQL reference\n${hogql}\n` : ""}${
 
 const SCOUTS = new Set(["friction"]);
 
-export async function runSkill(name, config, probes) {
+export async function runSkill(name, config, probes, { run = runWith, runId, onEvent = () => {}, scope } = {}) {
   if (name === "research") {
     throw new Error("research is not a scout. launch it with `rusubon pr <slug|issue>`");
   }
@@ -111,27 +116,49 @@ export async function runSkill(name, config, probes) {
     throw new Error(`${name} is not a scout. launch research with \`rusubon pr <slug|issue>\``);
   }
   assertReady(config, probes);
+  if (!scope && config.scout) scope = resolveScoutScope(config.scout, { posthog: config.posthog, context: loadContext().body, confirmed: true });
+  if (scope) {
+    scope = structuredClone(scope);
+    if (scope.source.projectId !== String(config.posthog.projectId) || scope.source.region !== (/\beu\b/.test(config.posthog.host) ? "eu" : "us")) throw new Error("The PostHog source changed before the scout started.");
+    scope = { ...scope, id: createHash("sha256").update(JSON.stringify(scope)).digest("hex") };
+    // CLI scoped runs also get isolated artifacts, including repeated runs today.
+    runId ||= `scout-${randomUUID()}`;
+  }
   const skill = loadSkill(name);
   mkdirSync(runsDir(), { recursive: true });
   const before = snapshotState();
   const startedAt = Date.now();
+  if (runId && !/^[a-zA-Z0-9-]+$/.test(runId)) throw new Error("Invalid run id");
+  const files = runId ? { closeOut: `.rusubon/runs/${runId}/close-out.md`, candidates: `.rusubon/runs/${runId}/candidates.json` } : undefined;
+  const promptDir = runId ? resolve(runsDir(), runId) : runsDir();
+  mkdirSync(promptDir, { recursive: true });
+  if (scope) {
+    writeFileSync(resolve(promptDir, "scout-scope.json"), JSON.stringify(scope, null, 2) + "\n");
+    onEvent({ type: "scope", scope });
+  }
   console.log(`running ${skill.name}  project ${config.posthog.projectId}`);
 
-  const prompt1 = buildPrompt(skill, config, { phase: 1 });
-  writeFileSync(resolve(runsDir(), "last-prompt.md"), prompt1);
-  const result1 = runWith(config.runner, prompt1, { phase: 1 });
+  const prompt1 = buildPrompt(skill, config, { phase: 1, files, scope });
+  writeFileSync(resolve(promptDir, "last-prompt.md"), prompt1);
+  onEvent({ type: "phase", name: "SQL analysis", status: "running" });
+  const result1 = await run(config.runner, prompt1, { phase: 1, model: config.model || undefined, effort: config.effort || undefined });
   if (result1.status !== 0) {
     throw new Error(`${config.runner} exited ${result1.status} (phase 1)`);
   }
 
-  const close1 = closeOutBody(skill.name);
-  const candidates = loadCandidates(skill.name);
+  onEvent({ type: "phase", name: "SQL analysis", status: "completed" });
+  const close1 = closeOutBody(skill.name, new Date(), files?.closeOut);
+  if (scope && !close1.body?.trimStart().toLowerCase().startsWith("no posthog tools") && !existsSync(resolve(cwd(), files.candidates))) throw new Error("Scout did not write scoped candidates. Session review was not started.");
+  const candidates = scope && !close1.body?.trimStart().toLowerCase().startsWith("no posthog tools")
+    ? scopedCandidates(readFileSync(resolve(cwd(), files?.candidates || candidatesRel(skill.name)), "utf8"), scope)
+    : loadCandidates(skill.name, new Date(), files?.candidates);
   let timedOut = false;
   if (shouldRunPhase2(config, candidates, close1.body)) {
-    const prompt2 = buildPrompt(skill, config, { phase: 2, candidates });
-    writeFileSync(resolve(runsDir(), "last-prompt-phase2.md"), prompt2);
+    const prompt2 = buildPrompt(skill, config, { phase: 2, candidates, files, scope });
+    writeFileSync(resolve(promptDir, "last-prompt-phase2.md"), prompt2);
     const read = config.read || {};
-    const result2 = runWith(config.runner, prompt2, {
+    onEvent({ type: "phase", name: "Session review", status: "running", candidates: candidates.ids.length });
+    const result2 = await run(config.runner, prompt2, {
       phase: 2,
       model: read.model || undefined,
       effort: read.effort || "low",
@@ -142,11 +169,12 @@ export async function runSkill(name, config, probes) {
     if (!timedOut && result2.status !== 0) {
       throw new Error(`${config.runner} exited ${result2.status} (phase 2)`);
     }
+    onEvent({ type: "phase", name: "Session review", status: timedOut ? "timed_out" : "completed" });
   } else if (config.runner !== "claude" && candidates.ids.length) {
     console.log(`phase 2 skipped (${config.runner} is SQL-only). ${candidates.ids.length} candidates left unread.`);
   }
 
-  const summary = summarizeRun({ skillName: skill.name, startedAt, before });
+  const summary = summarizeRun({ skillName: skill.name, startedAt, before, closeOut: files?.closeOut });
   console.log("");
   console.log(formatRunSummary(summary));
   if (timedOut) console.log("          phase 2 timed out");
@@ -155,4 +183,5 @@ export async function runSkill(name, config, probes) {
   if (!summary.closeOut) {
     throw new Error(`scout did not write ${summary.skill} close-out`);
   }
+  return { ...summary, timedOut };
 }
