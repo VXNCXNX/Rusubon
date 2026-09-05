@@ -362,6 +362,15 @@ test("close-out starting with no PostHog tools is mcp=missing", () => {
   assert.equal(summary.reports.length, 0);
 });
 
+test("a missing scoped close-out reports the path requested for that run", () => {
+  tmp(); initConfig();
+  const closeOut = ".rusubon/runs/ui-scoped/close-out.md";
+  const summary = summarizeRun({ skillName: "friction", startedAt: Date.now(), before: snapshotState(), closeOut });
+  assert.equal(summary.closeOut, null);
+  assert.ok(formatRunSummary(summary).includes(closeOut));
+  assert.doesNotMatch(formatRunSummary(summary), /\d{4}-\d{2}-\d{2}-friction\.md/);
+});
+
 test("takeOption parses --why", () => {
   assert.deepEqual(takeOption(["paywall-eu", "--why", "because"], "why"), {
     rest: ["paywall-eu"],

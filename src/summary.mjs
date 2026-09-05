@@ -71,8 +71,8 @@ export function mcpFromCloseOut(body) {
   return "ok";
 }
 
-export function summarizeRun({ skillName, startedAt, before, now = Date.now() }) {
-  const rel = closeOutRel(skillName);
+export function summarizeRun({ skillName, startedAt, before, now = Date.now(), closeOut }) {
+  const rel = closeOut || closeOutRel(skillName);
   const abs = join(cwd(), rel);
   const closeBody = existsSync(abs) ? readFileSync(abs, "utf8") : null;
   const after = snapshotState();
@@ -83,6 +83,7 @@ export function summarizeRun({ skillName, startedAt, before, now = Date.now() })
     duration: formatDuration(now - startedAt),
     mcp: mcpFromCloseOut(closeBody),
     closeOut: closeBody == null ? null : rel,
+    closeOutPath: rel,
     closeLine: closeBody ? firstUsefulLine(closeBody) : "",
     reports,
     memory,
@@ -108,7 +109,7 @@ export function formatRunSummary(summary) {
     lines.push(`close-out ${summary.closeOut}`);
     if (summary.closeLine) lines.push(`          ${summary.closeLine}`);
   } else {
-    lines.push(`close-out missing — scout did not write ${closeOutRel(summary.skill)}`);
+    lines.push(`close-out missing, scout did not write ${summary.closeOutPath || closeOutRel(summary.skill)}`);
   }
   return lines.join("\n");
 }

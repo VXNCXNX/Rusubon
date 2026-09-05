@@ -59,7 +59,7 @@ export const RUNNERS = {
       const file = writePrompt(prompt);
       return spawnSync(
         "codex",
-        ["exec", "--skip-git-repo-check", "-"],
+        ["exec", "--skip-git-repo-check", ...(opts.model ? ["--model", opts.model] : []), ...(opts.effort ? ["-c", `model_reasoning_effort=${JSON.stringify(opts.effort)}`] : []), "-"],
         spawnOpts(opts, {
           input: prompt + `\n\n(prompt also at ${file})\n`,
           stdio: ["pipe", "inherit", "inherit"],

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFile
 import { join, dirname } from "node:path";
 import { afterEach, test } from "node:test";
 import { runPr } from "../src/pr.mjs";
+import { defaultProbes } from "../src/doctor.mjs";
 import { RUNNERS, runWith } from "../src/runners.mjs";
 import { assertReceipt, git } from "../skills/spec/scripts/evidence.mjs";
 import { fixture } from "./helpers/pr-fixture.mjs";
@@ -10,17 +11,18 @@ import { fixture } from "./helpers/pr-fixture.mjs";
 const originalCwd = process.cwd();
 const originalPath = process.env.PATH;
 const originalWhich = RUNNERS.codex.which;
+const originalClaudeWhich = RUNNERS.claude.which;
 const fixtures = [];
 function setup() {
   const f = fixture(); fixtures.push(f);
   process.chdir(f.repo);
   process.env.PATH = join(f.root, "bin") + ":" + originalPath;
   RUNNERS.codex.which = () => process.execPath;
-  f.start = (run = f.run, raw = "retry") => runPr({ raw, config: { runner: "codex" }, run });
+  f.start = (run = f.run, raw = "retry") => runPr({ raw, config: { runner: "codex" }, probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run });
   return f;
 }
 afterEach(() => {
-  process.chdir(originalCwd); process.env.PATH = originalPath; RUNNERS.codex.which = originalWhich;
+  process.chdir(originalCwd); process.env.PATH = originalPath; RUNNERS.codex.which = originalWhich; RUNNERS.claude.which = originalClaudeWhich;
   for (const f of fixtures.splice(0)) f.cleanup();
 });
 
@@ -39,6 +41,60 @@ test("default GitHub probes resolve issues and complete the two-phase draft-PR f
   assertReceipt(f.repo, f.latest.specDir, receipt);
   assert.equal(git(f.repo, ["status", "--porcelain"]), "");
   assert.equal(git(f.repo, ["ls-remote", "origin", `refs/heads/${git(f.repo, ["branch", "--show-current"])}`]).split(/\s/)[0], git(f.repo, ["rev-parse", "HEAD"]));
+});
+
+test("a prepared worktree branch publishes against its original base and exposes phase artifacts", async () => {
+  const f = setup(); git(f.repo, ["switch", "-c", "codex-ui-base-fixture"]);
+  const events = [];
+  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-5.6-luna", effort: "low" }, baseBranch: "main", probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run: f.run, onEvent: event => events.push(event) });
+  assert.ok(result.url); assert.equal(f.latest.options.model, "gpt-5.6-luna"); assert.equal(f.latest.options.effort, "low");
+  const publish = f.ghCalls().find(args => args[0] === "pr" && args[1] === "create");
+  assert.equal(publish[publish.indexOf("--base") + 1], "main");
+  assert.ok(events.some(event => event.type === "artifacts" && event.closeOut === result.closeOut));
+  assert.equal(events.at(-1).status, "completed");
+});
+
+test("research uses the spec creator and hands its validated files to a different implementation runner", async () => {
+  const f = setup(), calls = [];
+  RUNNERS.claude.which = () => process.execPath;
+  const spec = { runner: "claude", model: "claude-fable-5-1", effort: "max" };
+  const implementation = { runner: "codex", model: "gpt-5.6-sol", effort: "high" };
+  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-5.6-luna", effort: "low", spec, implementation },
+    probes: { ...defaultProbes(), claudeAuth: () => ({ loggedIn: true }), codexAuth: () => ({ loggedIn: true }) },
+    run: async (runner, prompt, options) => {
+      calls.push({ runner, model: options.model, effort: options.effort });
+      assert.match(prompt, new RegExp(`Runner: ${runner}`));
+      if (options.phase === "implementation") assert.ok(existsSync(join(f.latest.specDir, "requirements.md")));
+      return f.run(runner, prompt, options);
+    } });
+  assert.deepEqual(calls, [spec, implementation]);
+  assert.ok(result.url); assert.ok(f.ghCalls().some(args => args.includes("--draft")));
+});
+
+test("an asynchronous stop after verification prevents publishing", async () => {
+  const f = setup();
+  await assert.rejects(runPr({ raw: "retry", config: { runner: "codex" }, probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run: f.run,
+    beforePublish: async () => { await new Promise(resolve => setImmediate(resolve)); throw new Error("Run stopped before publishing"); } }), /stopped before publishing/);
+  assert.ok(!f.ghCalls().some(args => args[0] === "pr"));
+  assert.equal(git(f.repo, ["rev-parse", "HEAD"]), git(f.repo, ["rev-parse", "origin/main"]));
+});
+
+for (const stage of ["commit", "push", "create"]) test(`stop during ${stage} interrupts publishing before its next side effect`, async () => {
+  const f = setup(), controller = new AbortController(), entered = join(f.root, "publishing-entered");
+  const pause = `require('node:fs').writeFileSync(${JSON.stringify(entered)}, 'entered'); require('node:child_process').spawnSync(process.execPath, ['-e', 'setTimeout(()=>{},1500)']);`;
+  if (stage === "create") {
+    const path = join(f.root, "bin/gh");
+    const shim = readFileSync(path, "utf8");
+    writeFileSync(path, shim.replace("if(args[0]==='pr' && args[1]==='create') {", `if(args[0]==='pr' && args[1]==='create') {\n${pause}`));
+  } else writeFileSync(join(f.repo, `.git/hooks/pre-${stage}`), `#!${process.execPath}\n${pause}\n`, { mode: 0o755 });
+  const timer = setInterval(() => { if (existsSync(entered)) controller.abort(); }, 10);
+  try {
+    await assert.rejects(runPr({ raw: "retry", config: { runner: "codex" }, probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run: f.run, signal: controller.signal }), /stopped|abort/i);
+    assert.equal(existsSync(entered), true);
+    assert.equal(existsSync(f.publishedBody), false);
+    assert.ok(!f.ghCalls().some(args => args[0] === "pr" && args[1] === "view"));
+    if (stage !== "create") assert.equal(git(f.repo, ["ls-remote", "origin", "refs/heads/codex/*"]), "");
+  } finally { clearInterval(timer); }
 });
 
 test("maximum-length report slugs publish with bounded names and preserve source identity", async () => {
