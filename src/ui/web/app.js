@@ -153,7 +153,7 @@ document.addEventListener("click", protect(async event => {
   if (d.page) { navigate(d.page); if (d.page === "setup") fillSetup(); }
   if (d.job) await openJob(d.job);
   if (d.report) await openReport(d.report);
-  if (d.filter) { filter = d.filter; report = null; $("report-detail").hidden = true; $("finding-list").hidden = false; for (const tab of document.querySelectorAll("[data-filter]")) tab.setAttribute("aria-pressed", String(tab === button)); renderState(); }
+  if (d.filter) { filter = d.filter; report = null; $("report-detail").hidden = true; $("finding-list").hidden = false; for (const tab of document.querySelectorAll(".tabs [data-filter]")) tab.setAttribute("aria-pressed", String(tab.dataset.filter === filter)); renderState(); }
   if (Object.hasOwn(d, "backFindings")) {
     const slug = report?.slug; report = null; $("report-detail").hidden = true; $("finding-list").hidden = false;
     [...$("finding-list").querySelectorAll("[data-report]")].find(row => row.dataset.report === slug)?.focus({ preventScroll: true });

@@ -53,7 +53,7 @@ function scoutOutcomeView(job) {
     <p>${escape(outcome.description)}</p>
     <div class="caption outcome-counts">${escape(outcome.details)}</div>
     ${job.selection?.runner === "codex" ? `<p class="outcome-limit"><strong>SQL analysis only.</strong> Codex does not review individual sessions or file P2 friction findings. Choose Claude Code for a scout that can also review qualified sessions.</p>` : ""}
-    ${closeOut || outcome.count ? `<div class="actions">${closeOut ? `<button class="button" type="button" data-artifact="${escape(closeOut.key)}">Read results &amp; explanation ${icon("arrow")}</button>` : ""}${outcome.count ? `<button class="button" type="button" data-page="findings">View findings</button>` : ""}</div>` : ""}
+    ${closeOut || outcome.count ? `<div class="actions">${closeOut ? `<button class="button" type="button" data-artifact="${escape(closeOut.key)}">Read results &amp; explanation ${icon("arrow")}</button>` : ""}${outcome.count ? `<button class="button" type="button" data-page="findings" data-filter="open">View findings</button>` : ""}</div>` : ""}
   </section>`;
 }
 
