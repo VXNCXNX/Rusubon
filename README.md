@@ -7,6 +7,8 @@ Rusubon runs a scout on that login, through official PostHog MCP, and writes fri
 
 Early preview, version 0.1.0. Install from source below. The dashboard supports Claude Code and Codex; Cursor is CLI-only. See the [changelog](CHANGELOG.md) for release status.
 
+**Install with your agent:** `Read https://raw.githubusercontent.com/VXNCXNX/Rusubon/main/SETUP-AGENT.md and set up Rusubon for this product repository.`
+
 **Choose what to investigate, then launch with one click. Follow the evidence and your agent's progress in one place.**
 
 ![Rusubon scout launch with a PostHog project, date range, money paths, selectable checks, additional context, and compact agent controls.](docs/images/dashboard-launch.png)

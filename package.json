@@ -16,6 +16,7 @@
     "templates",
     "docs/inbox-contract.md",
     "docs/images",
+    "SETUP-AGENT.md",
     "CHANGELOG.md",
     "rusubon.example.json",
     "rusubon.mcp.example.json",
