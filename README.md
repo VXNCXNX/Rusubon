@@ -9,7 +9,7 @@ Early preview, version 0.1.0. Install from source below. The dashboard supports 
 
 **Choose what to investigate, then launch with one click. Follow the evidence and your agent's progress in one place.**
 
-![Rusubon scout launch with a PostHog project, date range, money paths, selectable checks, additional context, and compact agent controls.](docs/images/dashboard-launch.jpg)
+![Rusubon scout launch with a PostHog project, date range, money paths, selectable checks, additional context, and compact agent controls.](docs/images/dashboard-launch.png)
 
 *Screenshots use a demo workspace with illustrative data.*
 
@@ -80,7 +80,7 @@ rusubon ui --port 4242 --no-open         # print the URL without opening it
 
 **Follow each phase and answer your agent's questions directly in the dashboard.**
 
-![A scout run showing its saved investigation scope, phase progress, a product question, and live agent activity.](docs/images/dashboard-monitor.jpg)
+![A scout run showing its saved investigation scope, phase progress, a product question, and live agent activity.](docs/images/dashboard-monitor.png)
 
 The dashboard binds to `127.0.0.1`. Use the full URL printed by the command. Its
 fragment contains the session token, which the browser keeps in session storage.
