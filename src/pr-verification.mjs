@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { Parser } from "tap-parser";
@@ -53,7 +53,7 @@ export function passingTap(output) {
   return counts.passed;
 }
 
-/** Run every declared verification command against unchanged spec and code contents.
+/** Run verification commands in order against unchanged spec and code, stopping on failure.
  * Each command defaults to a two-minute budget and is force-killed on timeout.
  * Save redacted logs and a matching receipt, then validate completed implementation evidence. */
 export function verifyImplementation({ repo, specDir, runDir, runId, source, timeoutMs = 120000 }) {

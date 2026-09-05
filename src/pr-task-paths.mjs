@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { git, localPath } from "../skills/spec/scripts/evidence.mjs";

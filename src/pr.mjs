@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { assertPrReady, defaultProbes, redact } from "./doctor.mjs";
@@ -120,7 +120,9 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   mkdirSync(runsDir(), { recursive: true });
   const runDir = join(runsDir(), runId);
   mkdirSync(runDir);
-  const slug = source.kind === "issue" ? `issue-${source.number}` : source.slug;
+  // Keep date/UUID spec names and branch components below filesystem limits.
+  // The full source stays in results; the run UUID keeps shortened names unique.
+  const slug = (source.kind === "issue" ? `issue-${source.number}` : source.slug).slice(0, 160);
   const specPath = `docs/plans/${new Date().toISOString().slice(0, 10)}-${slug}-${runId}`;
   const specDir = localPath(repo, specPath);
   const closeOut = join(runDir, "close-out.md");
@@ -177,7 +179,8 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     const url = publish({ repo, specDir, runDir, receipt, result: implementation, branch, base, files });
     return finish("immediately_actionable", implementation.reason, url);
   } catch (error) {
-    finish("requires_human_input", error.message);
-    throw error;
+    const message = redact(error instanceof Error ? error.message : error);
+    finish("requires_human_input", message);
+    throw new Error(message);
   }
 }

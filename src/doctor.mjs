@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "../skills/spec/scripts/process.mjs";
 import { existsSync } from "node:fs";
 import { PLACEHOLDER_HOST, PLACEHOLDER_PROJECT, resolveHost } from "./config.mjs";
 import { PLACEHOLDER, loadContext } from "./context.mjs";

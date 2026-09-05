@@ -41,6 +41,38 @@ test("default GitHub probes resolve issues and complete the two-phase draft-PR f
   assert.equal(git(f.repo, ["ls-remote", "origin", `refs/heads/${git(f.repo, ["branch", "--show-current"])}`]).split(/\s/)[0], git(f.repo, ["rev-parse", "HEAD"]));
 });
 
+test("maximum-length report slugs publish with bounded names and preserve source identity", async () => {
+  const f = setup();
+  const slug = "a".repeat(252);
+  writeFileSync(join(f.repo, ".rusubon/inbox/reports", `${slug}.md`), "# Long report slug\n");
+  const result = await f.start(f.run, slug);
+  assert.ok(result.url);
+  assert.equal(f.latest.source, slug);
+  assert.ok(result.specPath.split("/").every((part) => Buffer.byteLength(part) <= 255));
+  assert.ok(git(f.repo, ["branch", "--show-current"]).split("/").every((part) => Buffer.byteLength(part) <= 255));
+});
+
+test("workflow errors redact generated credentials before returning them to callers", async () => {
+  for (const prefix of ["ph" + "c_", "ph" + "x_"]) {
+    const f = setup();
+    const secret = prefix + "TESTONLYNOTAREALCREDENTIAL";
+    let caught;
+    try {
+      await f.start(async (...args) => {
+        await f.run(...args);
+        writeFileSync(join(f.latest.specDir, secret), "unexpected artifact");
+        return { status: 0 };
+      });
+    } catch (error) { caught = error; }
+    assert.ok(caught instanceof Error);
+    assert.ok(!caught.message.includes(secret), "returned error must redact credentials");
+    assert.ok(!caught.stack.includes(secret), "stack must redact credentials");
+    const closeOut = readFileSync(join(dirname(f.latest.resultPath), "close-out.md"), "utf8");
+    assert.ok(!closeOut.includes(secret), "close-out must redact credentials");
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+  }
+});
+
 test("an old daily close-out cannot make a no-op runner succeed", async () => {
   const f = setup();
   mkdirSync(join(f.repo, ".rusubon/runs"), { recursive: true });

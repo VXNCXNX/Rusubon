@@ -13,6 +13,7 @@ rusubon.json                       # committed — projectId + host (us|eu) + ru
 .rusubon/inbox/reports/*.md        # gitignored — open findings
 .rusubon/inbox/archive/*.md        # gitignored — declined
 .rusubon/runs/*.md                 # gitignored: scout close-outs
+.rusubon/runs/*-friction-candidates.json # gitignored: phase-two session candidates
 .rusubon/runs/<run-id>/            # gitignored: PR prompts, results, logs, receipt and close-out
 ```
 
@@ -137,10 +138,16 @@ If those tools are not available in the runner session, write a close-out that s
 `origin`. A unique run id owns `.rusubon/runs/<run-id>/` and
 `docs/plans/<date>-<source>-<run-id>/`.
 Old close-outs and results from other sources or runs cannot complete this run.
+Generated directory and branch names use at most 160 characters of the source
+slug plus the run UUID. Results retain the full source reference.
 Runner phases have a 30-minute deadline; each verification command has two minutes.
-Timed subprocesses receive SIGKILL at their deadline so a SIGTERM handler cannot
-keep the launched process running. A phase timeout writes a failure close-out;
-a verification timeout also prevents issuing a receipt.
+On POSIX, timed commands run under a supervisor in a fresh process group.
+The group receives SIGKILL on timeout, interruption, output overflow or completion,
+so ordinary descendants stop too and cannot retain captured output pipes.
+Processes that deliberately create a separate session are outside that group.
+On Windows, timeouts use taskkill with its descendant-tree option.
+A phase timeout writes a failure close-out; a verification timeout also prevents
+issuing a receipt.
 
 1. Research writes the auto spec and a JSON result. It does not modify product
    code. The result includes run_id, source, phase, verdict and a nonempty reason.
@@ -165,7 +172,8 @@ a verification timeout also prevents issuing a receipt.
 3. A new runner phase implements on a unique `codex/rusubon-*` branch. It may
    change declared task files, checkboxes and closure, but not the validated plan.
    Its result also supplies pr_title and pr_body, including Agent context.
-4. The harness runs every command from the spec's verification array. Commands
+4. The harness runs the spec's verification commands in order, stopping at the
+   first failure, error or signal. Commands
    use executable argv and a repo-relative cwd. Test commands emit TAP with at
    least one named passing case and valid test plans at every nesting level;
    the TAP version header is optional. Nested wrappers count only their passing
@@ -183,6 +191,8 @@ a verification timeout also prevents issuing a receipt.
    is a reference copy, so hooks cannot change the published text by rewriting it.
 
 The harness writes `close-out.md` for completed phases and workflow failures.
+Workflow errors are redacted before being returned to callers, and the CLI
+redacts errors before printing them, including failures before a run is created.
 Early preflight failures do not create a run. Failed runs preserve their files
 and branch. Receipt checks govern publishing through the harness; they do not
 sandbox a runner with the user's credentials or prove test semantics. Ignored

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnBoundedSync as spawnSync } from "./process.mjs";
 
 /** Return a SHA-256 content digest for a string or buffer. */
 export const hash = (value) => createHash("sha256").update(value).digest("hex");

@@ -67,6 +67,7 @@ rusubon.json                       # committed: projectId + host (us|eu) + runne
 .rusubon/inbox/reports/*.md        # gitignored: open findings
 .rusubon/inbox/archive/*.md        # gitignored: declined
 .rusubon/runs/*.md                 # gitignored: close-outs
+.rusubon/runs/*-friction-candidates.json # gitignored: phase-two session candidates
 .rusubon/runs/<run-id>/            # gitignored: PR prompts, results, logs, receipt and close-out
 ```
 
