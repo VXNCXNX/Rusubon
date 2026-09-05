@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark"><title>Rusubon</title>
-  <link rel="icon" href="data:,"><link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script>
+  <link rel="icon" href="data:,"><link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/usage.css"><script type="module" src="/app.js"></script>
 </head>
 <body>
   <a class="skip" href="#content">Skip to content</a>
@@ -14,6 +14,7 @@
         <button type="button" data-static data-page="runs" aria-current="page"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg> Runs</button>
         <button type="button" data-static data-page="findings"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="3" width="12" height="14" rx="2"/><path d="M7 7h6M7 10h6M7 13h3"/></svg> Findings <span id="finding-count" class="count"></span></button>
         <button type="button" data-static data-page="research"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4v12M14 4v4a4 4 0 0 1-4 4H6"/><circle cx="6" cy="4" r="2"/><circle cx="14" cy="4" r="2"/><circle cx="6" cy="16" r="2"/></svg> Research</button>
+        <button type="button" data-static data-page="usage"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3v14h14M6 12l4-5 3 3 4-6"/></svg> Usage</button>
         <button type="button" data-static data-page="setup"><svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M4 14h12"/><circle cx="8" cy="6" r="2" fill="var(--side)"/><circle cx="12" cy="14" r="2" fill="var(--side)"/></svg> Setup</button>
       </nav>
       <div class="sidebar-bottom"><span class="local-dot"></span> On your machine.<br><span class="footnote">Works with PostHog.</span></div>
@@ -79,6 +80,7 @@
           </form>
           <details class="draft-context"><summary>Have your agent propose the context</summary><p class="caption">Save setup first. The selected model drafts context at low effort for you to review. Your confirmation is still required.</p><form id="context-form"><label>What does this product do?<textarea name="about" rows="3" placeholder="Who uses it, and what should they be able to do?"></textarea></label><button id="draft-context" type="submit" class="button">Draft product context</button></form></details>
         </section>
+        <section id="page-usage" hidden aria-labelledby="usage-title"></section>
         <section id="page-job" hidden aria-labelledby="job-title"><div id="job-detail"></div><div id="requests"></div><div id="job-activity"></div><div id="job-artifacts"></div></section>
       </main>
     </div>

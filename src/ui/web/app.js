@@ -4,6 +4,7 @@ import { createRefreshScheduler } from "/refresh.js";
 import { updateMarkup, enterPage } from "/interface.js";
 import { scopeControls } from "/scope-controls.js";
 import { windowLabel } from "/scope.js";
+import { usagePage } from "/usage.js";
 
 const $ = id => document.getElementById(id);
 const storage = { get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }, set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} } };
@@ -15,6 +16,7 @@ const seenFinished = new Set();
 let interactive = false;
 let scoutControls;
 const scrollPositions = new Map();
+const usage = usagePage($("page-usage"), api);
 
 async function api(path, data) {
   const response = await fetch(`/api${path}`, { method: data === undefined ? "GET" : "POST", headers: { "X-Rusubon-Token": token || "", ...(data === undefined ? {} : { "Content-Type": "application/json" }) }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
@@ -32,6 +34,7 @@ function navigate(next) {
   const changed = next !== page;
   if (changed) scrollPositions.set(page, window.scrollY);
   page = next;
+  if (page === "usage") usage.load();
   for (const section of document.querySelectorAll("main>section")) section.hidden = section.id !== `page-${page}`;
   for (const button of document.querySelectorAll("nav [data-page]")) { if (button.dataset.page === (page === "job" ? "runs" : page)) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current"); }
   $("page-label").textContent = page === "job" ? labels[currentJob?.kind] || "Run" : page[0].toUpperCase() + page.slice(1);
@@ -126,6 +129,7 @@ async function refresh() {
       if (["login", "connect_mcp"].includes(job.kind)) for (const runner of ["claude", "codex"]) api("/connections/refresh", { runner }).catch(() => {});
     }
     renderState();
+    if (page === "usage") usage.load();
     if (currentJob) { const id = currentJob.id; const detail = await api(`/jobs/${id}`); if (currentJob?.id === id) { currentJob = detail; renderJob(); } }
   } finally { refreshing = false; if (refreshAgain) { refreshAgain = false; scheduleRefresh(); } }
 }
@@ -243,13 +247,13 @@ setInterval(() => {
 }, 1000);
 // Refresh relative date previews when an open dashboard crosses midnight UTC.
 let previewDay = new Date().toISOString().slice(0, 10);
-setInterval(() => { const day = new Date().toISOString().slice(0, 10); if (state && day !== previewDay) { previewDay = day; renderState(); } }, 30_000);
+setInterval(() => { const day = new Date().toISOString().slice(0, 10); if (state && day !== previewDay) { previewDay = day; renderState(); if (page === "usage") usage.load(); } }, 30_000);
 
 try {
   await refresh();
   const savedPage = storage.get(`${selectionKey}:page`);
   if (savedPage?.page === "job" && state.jobs.some(job => job.id === savedPage.jobId)) await openJob(savedPage.jobId);
-  else if (["runs", "findings", "research", "setup"].includes(savedPage?.page)) navigate(savedPage.page);
+  else if (["runs", "findings", "research", "setup", "usage"].includes(savedPage?.page)) navigate(savedPage.page);
   interactive = true;
   for (const runner of ["claude", "codex"]) api("/connections/refresh", { runner }).catch(error => notice(error.message, true));
   followEvents();

@@ -10,6 +10,8 @@ import { artifacts, readArtifact } from "./artifacts.mjs";
 import { safeText } from "./process.mjs";
 import { acquireRepoLock } from "../lock.mjs";
 import { resolveScoutScope } from "../scout-scope.mjs";
+import { createUsageReader } from "./usage.mjs";
+import { saveUsageRate } from "./usage-pricing.mjs";
 
 const ASSETS = new Map([["/", ["index.html", "text/html"]], ["/app.css", ["app.css", "text/css"]], ["/app.js", ["app.js", "text/javascript"]], ["/views.js", ["views.js", "text/javascript"]], ["/requests.js", ["requests.js", "text/javascript"]]]);
 ASSETS.set("/refresh.js", ["refresh.js", "text/javascript"]);
@@ -17,6 +19,8 @@ ASSETS.set("/interface.js", ["interface.js", "text/javascript"]);
 ASSETS.set("/scope.js", ["../../scout-scope.mjs", "text/javascript"]);
 ASSETS.set("/scout-scope.mjs", ["../../scout-scope.mjs", "text/javascript"]);
 ASSETS.set("/scope-controls.js", ["scope-controls.js", "text/javascript"]);
+ASSETS.set("/usage.js", ["usage.js", "text/javascript"]);
+ASSETS.set("/usage.css", ["usage.css", "text/css"]);
 const json = (res, data, code = 200) => { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(data)); };
 async function body(req) {
   if (!/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) throw new Error("Expected application/json");
@@ -43,6 +47,7 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
     }
   } catch (error) { releaseServer(); throw error; }
   const token = randomBytes(32).toString("hex"), streams = new Set(), connections = new Map(), probing = new Map();
+  const readUsage = createUsageReader(repo);
   let origin, shuttingDown = false;
   const changed = id => { for (const stream of streams) if (!stream.write(`data: ${JSON.stringify({ id })}\n\n`)) { stream.destroy(); streams.delete(stream); } };
   jobs.on("change", changed);
@@ -69,6 +74,7 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
         res.on("close", () => { clearInterval(heartbeat); streams.delete(res); }); return;
       }
       if (req.method === "GET" && path === "/api/state") return json(res, { workspace: workspaceState(repo), connections: Object.fromEntries(connections), jobs: jobs.list(), reports: reports(repo), archived: reports(repo, true), modelAllowlist: MODEL_ALLOWLIST, roleModels: ROLE_MODELS });
+      if (req.method === "GET" && path === "/api/usage") return json(res, await readUsage(jobs.list(), { days: Number(url.searchParams.get("days") || 30), runner: url.searchParams.get("runner") || "all" }));
       const parts = path.split("/").filter(Boolean);
       if (req.method === "GET" && parts[0] === "api" && parts[1] === "reports" && parts.length === 3) return json(res, reportDetail(repo, decodeURIComponent(parts[2])));
       if (req.method === "GET" && parts[0] === "api" && parts[1] === "jobs" && parts.length === 3) {
@@ -77,6 +83,11 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
       if (req.method === "GET" && parts[1] === "jobs" && parts[3] === "artifact" && parts.length === 4) return json(res, readArtifact(repo, jobs.detail(parts[2]), url.searchParams.get("key")));
       if (req.method !== "POST") return json(res, { error: "Not found" }, 404);
       const input = await body(req);
+      if (path === "/api/usage/rates") {
+        // The dashboard owns ui.lock. Revision checking and the atomic write are
+        // synchronous, so concurrent browser saves cannot interleave here.
+        return json(res, saveUsageRate(repo, input));
+      }
       if (path === "/api/connections/refresh") { refreshConnection(input.runner); return json(res, { checking: true }, 202); }
       if (path === "/api/jobs") {
         if (!["init", "setup", "login", "connect_mcp", "context", "scout", "pr", "decline"].includes(input.kind)) throw new Error("Unsupported operation");

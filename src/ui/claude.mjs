@@ -102,7 +102,7 @@ export async function runClaude(prompt, { cwd, model, effort, permissionMode, si
         if (block.type === "text") emit({ type: "message", text: safeText(block.text) });
         if (block.type === "tool_use") emit({ type: "tool", name: block.name, text: safeText(JSON.stringify(block.input)), parentId: message.parent_tool_use_id || null });
       }
-      if (message.type === "result") { result = message; emit({ type: "usage", usage: message.usage, durationMs: message.duration_ms }); }
+      if (message.type === "result") { result = message; emit({ type: "usage", runner: "claude", sessionId: message.session_id, model, effort, usage: message.usage, modelUsage: message.modelUsage, totalCostUsd: message.total_cost_usd, durationMs: message.duration_ms }); }
     }
     if (selectionError) throw selectionError;
     if (!result || result.is_error || result.subtype !== "success") throw new Error(safeText(result?.errors?.join("\n") || "Claude did not complete this phase"));

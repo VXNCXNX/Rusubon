@@ -22,7 +22,8 @@
     "rusubon.mcp.example.json",
     "NOTICE",
     "LICENSE",
-    "LICENSE-PostHog-MIT"
+    "LICENSE-PostHog-MIT",
+    "LICENSE-ccusage-MIT"
   ],
   "engines": {
     "node": ">=22.12.0"
