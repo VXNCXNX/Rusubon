@@ -214,6 +214,46 @@ The frontend uses local static assets with no build step. Its Node server talks
 to the installed Claude Code CLI through the Claude Agent SDK and to Codex
 through its stdio app-server protocol. It does not require an ACP bridge.
 
+### Usage
+
+Open **Usage** to see daily cost and token charts, Claude Code / Codex totals,
+and a breakdown by model or day. Filter by agent and the last 7, 30, or 90 days.
+The section reads saved dashboard runs from the current product repository.
+It does not scan your machine's other agent sessions or terminal-only CLI runs.
+
+<details>
+<summary>See the Usage dashboard</summary>
+
+![Rusubon Usage with daily API estimates, separate cache token totals, and a model breakdown. Illustrative demo data.](docs/images/dashboard-usage.png)
+
+</details>
+
+Dollar amounts are **API estimates**, not subscription charges. Claude's reported
+per-model costs include delegated work when the runner provides it. Codex uses
+recorded token counters and Standard API rates. Cumulative updates count once;
+reasoning tokens are already part of output. Input, cache reads, cache writes,
+and output have separate totals. Dates use UTC; Claude usage appears when each
+phase reports its result. Stopped runs keep whatever usage was recorded.
+
+The bundled catalog includes Fable 5.1 and GPT-6 Astra, checked against
+[Claude pricing](https://platform.claude.com/docs/en/about-claude/pricing) and
+[OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-6-astra)
+on September 5, 2026. Astra has a separate cache-write rate. Codex estimates
+account for the higher rate above 272K input tokens when the request counters
+are available. Missing prices, unknown Claude cache-write durations, and
+incomplete history are shown explicitly. Fast mode, tool fees, and provider
+discounts can differ from the catalog estimate.
+
+Expand **How estimates work & model rates** to inspect the source or save rates
+for a model seen in your runs. Overrides live in `.rusubon/usage-rates.json`,
+stay local, and apply when the runner has no reliable cost. Reset restores the
+catalog. Saving rates adds missing Git ignore rules for older installations.
+Updating rates recalculates historical estimates.
+
+The Codex token normalization adapts a small part of
+[ccusage](https://github.com/ccusage/ccusage) under its MIT license. Attribution
+is in `NOTICE` and `LICENSE-ccusage-MIT`; no global transcript scan is needed.
+
 ## Use the CLI directly
 
 A finding is a file containing the affected path, a quantified change, and

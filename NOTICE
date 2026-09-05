@@ -25,3 +25,9 @@ VXNCXNX/spec-skill at commit 94b7656f9fa2e18f22234f099e5a594761a995c6
 (https://github.com/VXNCXNX/spec-skill), under the MIT license.
 The original notice is included in skills/spec/LICENSE. That skill credits
 KiroCrew's Spec Builder for the requirements/design/tasks method and ledger.
+
+The Codex token normalization in src/ui/usage.mjs is adapted from ccusage,
+Copyright (c) 2025 ryoppippi, under the MIT license. Source:
+https://github.com/ccusage/ccusage/blob/ea2d241976bf42f79bcc2b2ea245baf88b412cc1/rust/adapters/codex/src/types.rs
+The original notice is in LICENSE-ccusage-MIT. Rusubon reads only its own
+repository run history, and maintains its own model pricing catalog.

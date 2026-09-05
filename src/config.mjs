@@ -1,4 +1,4 @@
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolvePermissionMode } from "./permissions.mjs";
@@ -36,7 +36,8 @@ export function resolveHost(raw) {
   return "";
 }
 
-const GITIGNORE_LINES = [".rusubon/inbox/", ".rusubon/runs/"];
+export const USAGE_RATES_PATH = ".rusubon/usage-rates.json";
+const GITIGNORE_LINES = [".rusubon/inbox/", ".rusubon/runs/", USAGE_RATES_PATH, `${USAGE_RATES_PATH}.*.tmp`];
 
 export function configPath() {
   return resolve(cwd(), CONFIG_NAME);
@@ -96,7 +97,7 @@ export function initConfig() {
     console.log("wrote .rusubon/context.md — fill it in before `rusubon run`");
   }
 
-  ensureGitignore();
+  if (ensureGitignore()) console.log("updated .gitignore for local Rusubon data");
   const mcpExample = resolve(cwd(), "rusubon.mcp.example.json");
   const bundled = resolve(pkgRoot(), "rusubon.mcp.example.json");
   if (!existsSync(mcpExample) && existsSync(bundled)) {
@@ -106,15 +107,17 @@ export function initConfig() {
   console.log("ready. fill .rusubon/context.md (or `rusubon context draft`) and rusubon.json, then `rusubon run friction`.");
 }
 
-function ensureGitignore() {
-  const gi = resolve(cwd(), ".gitignore");
+/** Append missing local-data rules without replacing the product's ignore file. */
+export function ensureGitignore(repo = cwd()) {
+  const gi = resolve(repo, ".gitignore");
+  if (lstatSync(gi, { throwIfNoEntry: false })?.isSymbolicLink()) throw new Error(".gitignore must not be a symbolic link");
   const existing = existsSync(gi) ? readFileSync(gi, "utf8") : "";
   const missing = GITIGNORE_LINES.filter((line) => !existing.split(/\r?\n/).includes(line));
-  if (!missing.length) return;
+  if (!missing.length) return false;
   const prefix = existing && !existing.endsWith("\n") ? "\n" : "";
   if (!existsSync(gi)) writeFileSync(gi, missing.join("\n") + "\n");
   else appendFileSync(gi, prefix + missing.join("\n") + "\n");
-  console.log("updated .gitignore for .rusubon/inbox and .rusubon/runs");
+  return true;
 }
 
 export function pkgRoot() {

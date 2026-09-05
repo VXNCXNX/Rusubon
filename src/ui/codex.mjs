@@ -67,7 +67,7 @@ export async function runCodex(prompt, { cwd, model, effort, permissionMode, sig
       if (item?.type === "agentMessage" && method === "item/completed") emit({ type: "message", text: safeText(item.text) });
       else if (item && !["reasoning", "userMessage", "agentMessage"].includes(item.type)) emit({ type: "tool", name: item.type, status: method === "item/started" ? "running" : item.status || "completed", text: safeText(item.command || item.tool || item.aggregatedOutput || "") });
     }
-    if (method === "thread/tokenUsage/updated") emit({ type: "usage", usage: params.tokenUsage });
+    if (method === "thread/tokenUsage/updated") emit({ type: "usage", runner: "codex", sessionId: params.threadId || threadId, model, effort, usage: params.tokenUsage });
     if (method === "turn/completed") {
       if (params.turn?.status === "completed") finish({ status: 0, timedOut: false });
       else fail(new Error(safeText(params.turn?.error?.message || `Codex turn ${params.turn?.status || "failed"}`)));
