@@ -27,7 +27,8 @@ export function assertPublishableTaskPaths(repo, declarations) {
   // Tracked files remain eligible when ignore rules match. Recheck on every
   // validation so implementation cannot introduce new exclusions.
   const ignored = spawnSync("git", ["check-ignore", "--stdin", "-z"], {
-    cwd: repo, input: paths.join("\0") + "\0", encoding: "utf8", timeout: 30000,
+    // Prefix relative paths so a literal leading colon cannot introduce Git magic.
+    cwd: repo, input: paths.map((path) => `./${path}`).join("\0") + "\0", encoding: "utf8", timeout: 30000,
   });
   if (ignored.status === 0) throw new Error(`ignored task files cannot be published: ${ignored.stdout.split("\0").filter(Boolean).join(", ")}`);
   if (ignored.status !== 1) throw new Error(`cannot check task file visibility: ${ignored.stderr || ignored.error?.message || ignored.status}`);

@@ -1,4 +1,5 @@
 // Shared task boundaries and file declarations for validation and execution.
+import { parsePathList } from "./path-list.mjs";
 export function parseTasks(text) {
   const boundaries = [...text.matchAll(/^[ \t]*-[ \t]*\[([ xX])\][ \t]+|^#{1,6}[ \t]+/gm)];
   const tasks = boundaries.flatMap((match, index) => match[1] === undefined ? [] : [{
@@ -19,7 +20,8 @@ export function parseTasks(text) {
       problems.push(`task ${index + 1} needs exactly one nonempty Files: declaration`);
       continue;
     }
-    task.files = declarations[0][1].split(",").map((path) => path.trim().replace(/^`|`$/g, ""));
+    try { task.files = parsePathList(declarations[0][1]); }
+    catch (error) { problems.push(`task ${index + 1} Files: ${error.message}`); }
   }
   return { tasks, problems };
 }

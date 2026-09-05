@@ -382,6 +382,64 @@ test("post-verification commit hooks cannot publish changed code", async () => {
   assert.equal(git(f.repo, ["ls-remote", "origin", `refs/heads/${branch}`]), "");
 });
 
+test("staged and hook-added run artifacts cannot enter a published commit", async () => {
+  for (const phase of ["implementation", "commit hook"]) {
+    const f = setup();
+    if (phase === "commit hook") writeFileSync(join(f.repo, ".git/hooks/pre-commit"),
+      "#!/bin/sh\nmkdir -p .rusubon/runs\nprintf private > .rusubon/runs/private.md\ngit add -f -- .rusubon/runs/private.md\n", { mode: 0o755 });
+    await assert.rejects(f.start(async (...args) => {
+      await f.run(...args);
+      if (phase === "implementation" && f.calls.length === 2) {
+        writeFileSync(join(f.repo, ".rusubon/runs/private.md"), "private");
+        git(f.repo, ["add", "-f", "--", ".rusubon/runs/private.md"]);
+      }
+      return { status: 0 };
+    }), /paths differ from verified files/);
+    assert.ok(!f.ghCalls().some((args) => args[0] === "pr"));
+    assert.equal(git(f.repo, ["ls-remote", "origin", `refs/heads/${git(f.repo, ["branch", "--show-current"])}`]), "");
+  }
+});
+
+test("quoted comma paths and literal Git filenames survive through publishing", async () => {
+  for (const format of ["code spans", "JSON"]) {
+    const f = setup();
+    const names = ["data,legacy.mjs", "name[1]*.mjs", ":(glob)*", "a`b.mjs"];
+    const result = await f.start(async (...args) => {
+      await f.run(...args);
+      if (f.calls.length === 1) {
+        const path = join(f.latest.specDir, "tasks.md");
+        const files = ["retry.mjs", "test/retry.test.mjs", ...names];
+        const value = format === "JSON" ? JSON.stringify(files)
+          : files.map((name) => name.includes("`") ? "``" + name + "``" : "`" + name + "`").join(", ");
+        writeFileSync(path, readFileSync(path, "utf8").replace(/^Files:.*$/m, `Files: ${value}`));
+      } else for (const name of names) writeFileSync(join(f.repo, name), "declared content");
+      return { status: 0 };
+    });
+    assert.ok(result.url);
+    const committed = git(f.repo, ["ls-tree", "-r", "--name-only", "-z", "HEAD"]).split("\0");
+    for (const name of names) assert.ok(committed.includes(name), name);
+  }
+});
+
+test("Git normalization may omit a verified edit while publishing the product fix", async () => {
+  const f = setup();
+  writeFileSync(join(f.repo, ".gitattributes"), "line-ending.txt text eol=crlf\n");
+  writeFileSync(join(f.repo, "line-ending.txt"), "same content\r\n");
+  git(f.repo, ["add", ".gitattributes", "line-ending.txt"]);
+  git(f.repo, ["commit", "-m", "fixture line endings"]);
+  git(f.repo, ["push", "origin", "main"]);
+  const result = await f.start(async (...args) => {
+    await f.run(...args);
+    if (f.calls.length === 1) {
+      const task = join(f.latest.specDir, "tasks.md");
+      writeFileSync(task, readFileSync(task, "utf8").replace("Files:", "Files: `line-ending.txt`,"));
+    } else writeFileSync(join(f.repo, "line-ending.txt"), "same content\n");
+    return { status: 0 };
+  });
+  assert.ok(result.url);
+  assert.ok(!git(f.repo, ["diff", "--name-only", "HEAD^", "HEAD"]).includes("line-ending.txt"));
+});
+
 test("verified removals keep the same content fingerprint after commit", async () => {
   const f = setup();
   writeFileSync(join(f.repo, "obsolete.txt"), "obsolete");

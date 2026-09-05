@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, statSync, lstatSync, realpathSyn
 import { resolve, join, relative } from "node:path";
 import { assertReceipt, localPath, specFiles } from "./evidence.mjs";
 import { parseTasks } from "./tasks.mjs";
+import { parsePathList } from "./path-list.mjs";
 
 const [specDir, ...flags] = process.argv.slice(2);
 const receiptIndex = flags.indexOf("--receipt");
@@ -162,10 +163,13 @@ let assertions = 0;
 for (const [id, body] of criterionBlocks) {
   if (!/SHALL\s+CONTINUE\s+TO/.test(body)) continue;
   assertions++;
-  const proof = body.match(/Proven by:[ \t]*`?([^`\n]+)`?[ \t]*$/m)?.[1]?.trim();
-  if (!proof) fail(`non-regression criterion ${id} needs Proven by:`);
+  const proofText = body.match(/Proven by:[ \t]*([^\n]+)$/m)?.[1];
+  if (!proofText) fail(`non-regression criterion ${id} needs Proven by:`);
   else {
     try {
+      const proofs = parsePathList(proofText);
+      if (proofs.length !== 1) throw new Error(`non-regression criterion ${id} needs one Proven by: path`);
+      const [proof] = proofs;
       const path = localPath(process.cwd(), proof);
       if (!isFile(path) && (complete || state.closure === "implemented" || !files.has(proof))) {
         fail(`non-regression test ${proof} must exist${complete ? "" : " or be created by a task"}`);

@@ -72,6 +72,16 @@ test("complete plan accepts auto recommendations and planned regression tests", 
   assert.equal(result.status, 0, result.output);
 });
 
+test("non-regression proof paths share the task path-list syntax", () => {
+  for (const name of ["test/data,legacy.mjs", "test/a`b.mjs"]) {
+    const f = fixture();
+    f.write("requirements.md", f.requirements.replace("`test/search.test.mjs`", JSON.stringify([name])));
+    f.write("tasks.md", f.tasks.replace(/^  Files:.*$/m, `  Files: ${JSON.stringify(["src/search.mjs", name])}`));
+    const result = f.run();
+    assert.equal(result.status, 0, result.output);
+  }
+});
+
 test("quick specs reject design files that are outside their validated file set", () => {
   const f = fixture();
   f.state.type = "quick"; f.save();

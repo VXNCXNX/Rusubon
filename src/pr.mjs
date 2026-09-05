@@ -37,6 +37,11 @@ function gh(repo, args) {
   return result.stdout.trim();
 }
 
+function changedGitPaths(repo, diffArgs) {
+  return git(repo, ["diff", "--no-renames", "--name-only", "-z", ...diffArgs, "--"])
+    .split("\0").filter(Boolean).sort();
+}
+
 function publish({ repo, specDir, runDir, receipt, result, branch, base, files }) {
   if (typeof result.pr_title !== "string" || !/^(fix|feat|refactor|test|docs|chore)(\([^)\n]+\))?: [^\n]+$/.test(result.pr_title)
       || typeof result.pr_body !== "string" || !/^## Agent context\s*$/im.test(result.pr_body)
@@ -51,12 +56,27 @@ function publish({ repo, specDir, runDir, receipt, result, branch, base, files }
   writeFileSync(bodyFile, `${result.pr_body.trim()}\n\n## Harness verification\n\n`
     + receipt.commands.map((command) => `- ${command.id}: exit 0${command.passed ? `, ${command.passed} passing TAP cases` : ""}.`).join("\n")
     + `\n\nSpec hash: \`${receipt.plan_hash}\`. Code content hash: \`${receipt.tree_hash}\`.\n`);
-  git(repo, ["add", "--", ...files]);
+  const parent = git(repo, ["rev-parse", "HEAD"]);
+  git(repo, ["--literal-pathspecs", "add", "--", ...files]);
+  const staged = changedGitPaths(repo, ["--cached", parent]);
+  // Git content filters can normalize a verified edit back to its base content.
+  if (staged.some((path) => !files.includes(path))) {
+    throw new Error("staged paths differ from verified files; refusing to publish");
+  }
+  if (!staged.some((path) => !path.startsWith(`${relative(repo, specDir)}/`))) {
+    throw new Error("implementation made no product change after Git normalization");
+  }
   git(repo, ["commit", "-m", result.pr_title]);
+  const commit = git(repo, ["rev-parse", "HEAD"]);
+  if (git(repo, ["rev-list", "--parents", "-n", "1", commit]) !== `${commit} ${parent}`) {
+    throw new Error("commit ancestry changed during publishing");
+  }
+  if (JSON.stringify(changedGitPaths(repo, [parent, commit])) !== JSON.stringify(staged)) {
+    throw new Error("committed paths differ from verified files; refusing to publish");
+  }
   // Hooks or another writer may change content during the commit.
   assertReceipt(repo, specDir, receipt);
   assertWorktreeMatchesHead(repo);
-  const commit = git(repo, ["rev-parse", "HEAD"]);
   if (git(repo, ["branch", "--show-current"]) !== branch) throw new Error("branch changed before push");
   git(repo, ["push", "--set-upstream", "origin", `${commit}:refs/heads/${branch}`]);
   assertHead(repo, commit, branch);

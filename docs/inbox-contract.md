@@ -147,7 +147,10 @@ Old close-outs and results from other sources or runs cannot complete this run.
    and nested directories, fail validation before implementation or verification.
    Each checkbox task has one nonempty Files: declaration. Stray declarations
    and duplicate Files: lines fail validation. Validation and execution share
-   the same task parser.
+   the same task parser. Paths may be comma-separated with whole-path backtick
+   quoting, or a JSON string array. Commas inside quoted paths are preserved;
+   empty entries and malformed quoting fail validation. Proven by: uses the
+   same syntax for exactly one path.
    Declared files must be visible to Git and outside the harness run directory.
    Git-administrative paths are excluded, including .git entries at any depth,
    symlink aliases and relocated Git metadata directories. Normal project files
@@ -167,6 +170,10 @@ Old close-outs and results from other sources or runs cannot complete this run.
 5. A harness receipt binds command results and logs to the run, source, spec
    and non-ignored code contents. The harness checks it before committing,
    pushing and creating a draft PR. It opens the PR for review and never merges.
+   Staging treats verified filenames literally. The staged delta may omit edits
+   normalized away by Git, but cannot add paths and must include a product change.
+   After hooks run, the commit must retain that exact path delta and the expected
+   parent. This also rejects force-added run artifacts excluded from receipts.
 
 The harness writes `close-out.md` for completed phases and workflow failures.
 Early preflight failures do not create a run. Failed runs preserve their files

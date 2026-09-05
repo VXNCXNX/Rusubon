@@ -91,6 +91,11 @@ The validator rejects unresolved decisions and blockers.
 Put exactly one nonempty `Files:` line inside each checkbox task. Task blocks
 end at the next checkbox or Markdown heading. List every path the task may edit;
 declarations outside task blocks or repeated within a task fail validation.
+Use comma-separated paths, quoting each whole path in backticks when it contains
+a comma. For arbitrary filenames, use a JSON string array, for example
+`Files: ["src/data,legacy.mjs", "test/data.test.mjs"]`. Empty entries and malformed
+quoting fail validation. `Proven by:` accepts the same syntax with exactly one
+path. Paths are literal filenames, including any wildcard characters.
 Choose paths Git can publish. Ignored untracked paths and the harness run
 directory cannot be task outputs; already-tracked files may match ignore rules.
 Git-administrative paths, including `.git` entries and aliases into Git metadata,
