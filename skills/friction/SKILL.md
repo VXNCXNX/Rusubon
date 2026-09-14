@@ -44,9 +44,9 @@ Qualified session: hit a **context.md money path** in the last 7d, **and** at le
 }
 ```
 
-## Phase 2 — read (Claude parent + sub-agents)
+## Phase 2 — read
 
-The harness starts a second Claude process (`--effort low`, or `read.model` / `read.effort` in `rusubon.json`) and pastes the candidates.
+The harness starts a second process of the configured runner (`read.effort` default `low`; Claude may use `read.model`) and pastes the candidates.
 
 1. Read `.rusubon/memory/dedupe/friction-session-cursor.md` if it exists. Apply the skip rule again.
 2. Take at most **100** remaining ids (already worst-first). Stop at **45 minutes**.

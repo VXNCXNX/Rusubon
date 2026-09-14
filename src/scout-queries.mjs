@@ -54,12 +54,12 @@ uniqIf(properties.$session_id, timestamp >= ${start}) AS sessions_current,
 uniqIf(person_id, timestamp >= ${start}) AS persons_current
 FROM events WHERE event = '$exception' AND ${range("timestamp", baseline)} AND ${focus}
 GROUP BY host, path ORDER BY errors_current DESC LIMIT 50`);
-    add("exception-types", "Exception types on selected paths, selected period vs previous period", `SELECT properties.$exception_type AS exception_type, ${surface} AS path,
+    add("exception-types", "Exception types on selected paths, selected period vs previous period", `SELECT properties.$host AS host, properties.$exception_type AS exception_type, ${surface} AS path,
 countIf(timestamp >= ${start}) AS errors_current, countIf(timestamp < ${start}) AS errors_baseline,
 uniqIf(properties.$session_id, timestamp >= ${start}) AS sessions_current,
 uniqIf(person_id, timestamp >= ${start}) AS persons_current
 FROM events WHERE event = '$exception' AND ${range("timestamp", baseline)} AND ${focus}
-GROUP BY exception_type, path ORDER BY errors_current DESC LIMIT 50`);
+GROUP BY host, exception_type, path ORDER BY errors_current DESC LIMIT 50`);
     add("broken-sessions", "Failed requests and errors after clicks, per recorded session", `SELECT session_id,
 sum(console_error_after_click_count) AS errors_after_click,
 sum(network_failed_request_count) AS failed_requests,

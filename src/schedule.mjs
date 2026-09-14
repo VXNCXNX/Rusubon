@@ -225,6 +225,30 @@ export function planTick(policy, ledger, kicks, now) {
   return work;
 }
 
+function patrolStamp(ledger, scout) {
+  const value = ledger.scouts?.[scout]?.lastPatrolAt ?? null;
+  if (value == null) return null;
+  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+/** Kick first, then never-run, then oldest lastPatrolAt, then catalog order. */
+export function pickTickWork(work, ledger) {
+  if (!work.length) return null;
+  const order = new Map(listScouts().map((row, i) => [row.name, i]));
+  return [...work].sort((a, b) => {
+    const kickA = a.origin.includes("kick") ? 0 : 1;
+    const kickB = b.origin.includes("kick") ? 0 : 1;
+    if (kickA !== kickB) return kickA - kickB;
+    const lastA = patrolStamp(ledger, a.scout);
+    const lastB = patrolStamp(ledger, b.scout);
+    if (lastA == null && lastB != null) return -1;
+    if (lastB == null && lastA != null) return 1;
+    if (lastA != null && lastB != null && lastA !== lastB) return lastA - lastB;
+    return (order.get(a.scout) ?? 0) - (order.get(b.scout) ?? 0);
+  })[0];
+}
+
 /**
  * @param {object} ledger
  * @param {{ scout: string, origin: string }} work
@@ -355,7 +379,7 @@ export async function tick(config, opts = {}) {
       return { status: "quiet", at: now };
     }
 
-    const item = work[0];
+    const item = pickTickWork(work, ledger);
     try {
       await run(item.scout, scopedConfig(config), opts.probes);
     } catch (error) {
@@ -419,9 +443,11 @@ export function printScheduleStatus(status) {
   for (const row of status.policy.scouts) {
     lines.push(`schedule  ${row.scout}  ${cadenceLabel(row.cadence)}`);
   }
-  const host = status.host.installed
+  const host = status.host.installed && status.host.tickEvery
     ? `${status.host.kind}  every ${status.host.tickEvery.minutes}m`
-    : `${status.host.kind}  not installed`;
+    : status.host.installed
+      ? `${status.host.kind}  interval unknown`
+      : `${status.host.kind}  not installed`;
   lines.push(`host      ${host}  (one per product checkout)`);
   lines.push(`pending   ${status.pendingKicks.join(" ") || "(none)"}`);
   for (const row of status.next) {

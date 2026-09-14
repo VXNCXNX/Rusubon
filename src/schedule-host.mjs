@@ -19,7 +19,24 @@ function agentPath(repo) {
 
 function runHost(input, bin, args, opts = {}) {
   const run = input.run || input.probes?.run || ((command, argv, extra) => spawnSync(command, argv, { encoding: "utf8", ...extra }));
-  return run(bin, args, opts) || { status: 0, stdout: "", stderr: "" };
+  return run(bin, args, opts) ?? { status: 0, stdout: "", stderr: "" };
+}
+
+function hostOutput(result) {
+  return String(result.stderr || result.stdout || "").trim();
+}
+
+function requireHost(result, name) {
+  if ((result.status ?? 0) !== 0) throw new Error(`${name} failed: ${hostOutput(result) || result.status}`);
+  return result;
+}
+
+function emptyCrontab(result) {
+  return (result.status ?? 0) !== 0 && /no crontab/i.test(`${result.stderr || ""} ${result.stdout || ""}`);
+}
+
+function hostPath() {
+  return process.env.PATH || "/usr/bin:/bin:/usr/sbin:/sbin";
 }
 
 function xml(value) {
@@ -52,8 +69,9 @@ function launchdState(repo) {
 
 function crontabText(input) {
   const listed = runHost(input, "crontab", ["-l"]);
-  if (listed.status !== 0) return "";
-  return String(listed.stdout || "");
+  if ((listed.status ?? 0) === 0) return String(listed.stdout || "");
+  if (emptyCrontab(listed)) return "";
+  throw new Error(`crontab -l failed: ${hostOutput(listed) || listed.status}`);
 }
 
 function cronState(repo, input = {}) {
@@ -96,6 +114,11 @@ ${args}
   </array>
   <key>WorkingDirectory</key>
   <string>${xml(resolve(input.repo))}</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${xml(hostPath())}</string>
+  </dict>
   <key>StartInterval</key>
   <integer>${minutes * 60}</integer>
 </dict>
@@ -104,7 +127,7 @@ ${args}
   writeFileSync(path, body);
   const domain = `gui/${process.getuid()}`;
   runHost(input, "launchctl", ["bootout", domain, path]);
-  runHost(input, "launchctl", ["bootstrap", domain, path]);
+  requireHost(runHost(input, "launchctl", ["bootstrap", domain, path]), "launchctl bootstrap");
   return { kind: "launchd", installed: true, tickEvery: { minutes } };
 }
 
@@ -113,8 +136,8 @@ function writeCrontab(input) {
   const marker = cronMarker(input.repo);
   const kept = crontabText(input).split(/\n/).filter((row) => row && !row.includes(marker));
   const command = input.bin.map(shQuote).join(" ");
-  kept.push(`*/${minutes} * * * * cd ${shQuote(resolve(input.repo))} && ${command} ${marker}`);
-  runHost(input, "crontab", ["-"], { input: `${kept.join("\n")}\n` });
+  kept.push(`*/${minutes} * * * * PATH=${shQuote(hostPath())} cd ${shQuote(resolve(input.repo))} && ${command} ${marker}`);
+  requireHost(runHost(input, "crontab", ["-"], { input: `${kept.join("\n")}\n` }), "crontab -");
   return { kind: "cron", installed: true, tickEvery: { minutes } };
 }
 
@@ -140,6 +163,6 @@ export function removeHost(repo, input = {}) {
   }
   const marker = cronMarker(repo);
   const kept = crontabText(input).split(/\n/).filter((row) => row && !row.includes(marker));
-  runHost(input, "crontab", ["-"], { input: kept.length ? `${kept.join("\n")}\n` : "" });
+  requireHost(runHost(input, "crontab", ["-"], { input: kept.length ? `${kept.join("\n")}\n` : "" }), "crontab -");
   return { kind: "cron", installed: false, tickEvery: null };
 }

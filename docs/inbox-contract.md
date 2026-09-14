@@ -19,9 +19,10 @@ Fable 5 remains excluded. An
 unavailable model fails before inference, with no alias or automatic fallback.
 Both PR phase selections are immutable run metadata, including on a rerun.
 The research phase uses the spec creator; implementation reads the validated
-spec in a separate agent phase with its own selection. Claude session review
-uses the saved read model at `low` effort. Codex session review reuses the
-scout model at `low` effort.
+spec in a separate agent phase with its own selection. Claude and Codex session
+review use `read.effort` (default `low`). Claude may use `read.model`. Codex
+reuses the scout model. Cursor reuses the scout model and does not apply
+`read.effort`.
 
 Dashboard scouts require an explicit investigation scope: scout (`friction` or
 `errors`), PostHog project and
@@ -169,7 +170,7 @@ Do not file if the shape is in `context.md` intentional friction, or a `noise:` 
 The harness runs the skill twice when candidates exist:
 
 1. **Phase 1 (SQL)** — the scout's cheap aggregates and session qualification. Writes candidates even if `ids` is `[]`. Friction may file P1 capture cliff, P3 Vision watch-gap, or `not-in-use`. Errors may file `not-in-use` when `$exception` is absent. Neither files a P2 cluster here.
-2. **Phase 2 (read)** — only if that file has ids. Second runner process (`read.effort` default `low`; Claude may use `read.model`, Codex/Cursor reuse the scout model). Parent spawns sub-agents (~10 ids each), or reads sequentially if Task is missing. Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor file: `.rusubon/memory/dedupe/<scout>-session-cursor.md`. Skip an id until a newer cheap signal.
+2. **Phase 2 (read)** — only if that file has ids. Second runner process (`read.effort` default `low` for Claude and Codex; Claude may use `read.model`; Codex reuses the scout model; Cursor reuses the scout model and ignores `read.effort`). Parent spawns sub-agents (~10 ids each), or reads sequentially if Task is missing. Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor file: `.rusubon/memory/dedupe/<scout>-session-cursor.md`. Skip an id until a newer cheap signal.
 
 Qualified id: money path from `context.md` in the selected window, plus the scout's enabled signals. Friction: `$rageclick` / `$dead_click` / `$exception` / `$recording_observed` or a broken-experience row. Errors: `$exception` or `session_features`. Sort by signal count. Read events + console + `session_replay_features` + replay **metadata** MCP tools if present. Read stored session summaries if present. Never generate summaries. Heatmaps if present; skip if absent. No video. No new Vision scanner.
 

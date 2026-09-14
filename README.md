@@ -341,7 +341,7 @@ rusubon.json                       # committed: projectId + host (us|eu) + runne
 
 Optional `schedule` maps a scout to an interval such as `24h` or a 5-field UTC cron. `rusubon schedule install` writes `{ "friction": "24h", "errors": "24h" }` when the key is missing. An explicit `{}` stays empty.
 
-`read.effort` / `read.model` apply to the session-read pass only (Claude). Omit `read.model` to keep the CLI default model.
+`read.effort` (default `low`) applies to the session-read pass for Claude and Codex. `read.model` is Claude-only. Cursor reuses the scout model and ignores `read.effort`. Omit `read.model` to keep the CLI default model.
 
 | `runner` | What it uses | Bills |
 | --- | --- | --- |

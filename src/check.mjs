@@ -18,8 +18,12 @@ export function extractReportQueries(body) {
 }
 
 export function hasCheckHeading(body, day = new Date()) {
+  return countCheckVerdicts(body, day) > 0 || new RegExp(`^## Check ${new Date(day).toISOString().slice(0, 10)}\\b`, "m").test(String(body || ""));
+}
+
+export function countCheckVerdicts(body, day = new Date()) {
   const date = new Date(day).toISOString().slice(0, 10);
-  return new RegExp(`^## Check ${date}\\b`, "m").test(String(body || ""));
+  return [...String(body || "").matchAll(new RegExp(`^## Check ${date}\\s*$\\nverdict:\\s*(still_live|quiet)\\s*$`, "gm"))].length;
 }
 
 export function buildCheckPrompt({ report, queries, config, closeOut, today }) {
@@ -43,6 +47,7 @@ A markdown table of the new numbers. Pin calendar dates.
 The HogQL you just ran, in a \`\`\`sql\`\`\` fence.
 
 If the surface is still elevated vs its own baseline, use still_live. If it has returned to the baseline the original report used, use quiet. A quiet check does not archive the report.
+After a successful check, write \`${closeOut}\` with duration, MCP availability, the verdict, and remaining work. Do not skip that file when PostHog tools are available.
 
 # Product context
 ${loadContext().body.trim()}
@@ -76,6 +81,7 @@ export async function checkReport(raw, config, probes, { run = runWith, runId, o
   const closeOut = `.rusubon/runs/${runId}/close-out.md`;
   const today = new Date().toISOString().slice(0, 10);
   const before = snapshotState();
+  const priorVerdicts = countCheckVerdicts(report.body, today);
   const startedAt = Date.now();
   const prompt = buildCheckPrompt({ report, queries, config, closeOut, today });
   writeFileSync(resolve(runsDir(), runId, "last-prompt.md"), prompt);
@@ -92,12 +98,14 @@ export async function checkReport(raw, config, probes, { run = runWith, runId, o
   if (close.body == null) throw new Error(`check did not write ${closeOut}`);
   const missingTools = close.body.trimStart().toLowerCase().startsWith("no posthog tools");
   const updated = showReport(raw);
-  if (!missingTools && !hasCheckHeading(updated.body, today)) {
-    throw new Error(`check did not append '## Check ${today}' to ${reportRel(report)}`);
+  const nextVerdicts = countCheckVerdicts(updated.body, today);
+  if (!missingTools && nextVerdicts <= priorVerdicts) {
+    throw new Error(`check did not append a new '## Check ${today}' verdict to ${reportRel(report)}`);
   }
   onEvent({ type: "phase", name: "Evidence check", status: "completed" });
   const summary = summarizeRun({ skillName: "check", startedAt, before, closeOut });
   console.log("");
   console.log(formatRunSummary({ ...summary, skill: `check ${report.slug}` }));
-  return { ...summary, slug: report.slug, missingTools, verdict: ((updated.body.match(new RegExp(`^## Check ${today}\\s+verdict:\\s*(still_live|quiet)`, "m")) || [])[1] || null) };
+  const verdicts = [...updated.body.matchAll(new RegExp(`^## Check ${today}[\\s\\S]*?^verdict:\\s*(still_live|quiet)`, "gm"))];
+  return { ...summary, slug: report.slug, missingTools, verdict: missingTools ? null : (verdicts.at(-1)?.[1] || null) };
 }

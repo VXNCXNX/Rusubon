@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, test } from "node:test";
 import { trashFixture } from "./helpers/cleanup.mjs";
-import { buildCheckPrompt, checkReport, extractReportQueries, hasCheckHeading } from "../src/check.mjs";
+import { buildCheckPrompt, checkReport, countCheckVerdicts, extractReportQueries, hasCheckHeading } from "../src/check.mjs";
 import { initConfig, loadConfig } from "../src/config.mjs";
 import { reportRel, showReport } from "../src/inbox.mjs";
 
@@ -102,4 +102,33 @@ test("check prompt names the report path", () => {
   });
   assert.match(prompt, /\.rusubon\/inbox\/reports\/checkout-exceptions\.md/);
   assert.match(prompt, /verdict: still_live \| quiet/);
+  assert.match(prompt, /write `\.rusubon\/runs\/x\/close-out\.md`/);
+});
+
+test("a second same-day check needs a new verdict and missing tools hide the old one", async () => {
+  tmp();
+  ready();
+  const today = new Date().toISOString().slice(0, 10);
+  const first = `${reportBody}\n\n## Check ${today}\nverdict: quiet\nStill at baseline.\n`;
+  writeFileSync(".rusubon/inbox/reports/checkout-exceptions.md", first);
+  assert.equal(countCheckVerdicts(first, today), 1);
+  await assert.rejects(
+    checkReport("checkout-exceptions", loadConfig(), probes, {
+      runId: "check-repeat",
+      run: async () => {
+        writeFileSync(".rusubon/runs/check-repeat/close-out.md", "Re-ran. quiet.\n");
+        return { status: 0 };
+      },
+    }),
+    /did not append a new/,
+  );
+  const missing = await checkReport("checkout-exceptions", loadConfig(), probes, {
+    runId: "check-missing",
+    run: async () => {
+      writeFileSync(".rusubon/runs/check-missing/close-out.md", "no PostHog tools\n");
+      return { status: 0 };
+    },
+  });
+  assert.equal(missing.missingTools, true);
+  assert.equal(missing.verdict, null);
 });

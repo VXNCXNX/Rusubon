@@ -15,6 +15,7 @@ import {
   isDue,
   parseDuration,
   parseSchedule,
+  pickTickWork,
   planTick,
   printScheduleStatus,
   saveLedger,
@@ -386,9 +387,129 @@ test("schedule status shows lastSkip after an ask skip", async () => {
 
 test("contract names tick as the patrol entry", () => {
   const text = readFileSync(new URL("../docs/inbox-contract.md", import.meta.url), "utf8");
-  const line = text.split(/\n/)[166];
-  assert.equal(
-    line,
-    "`rusubon run <scout>` and `rusubon tick` start a scout. Tick is the patrol entry. Host install writes launchd or crontab that calls tick. Tick never opens a PR.",
+  assert.match(
+    text,
+    /`rusubon run <scout>` and `rusubon tick` start a scout\. Tick is the patrol entry\. Host install writes launchd or crontab that calls tick\. Tick never opens a PR\./,
+  );
+});
+
+test("never-run scout wins over a shorter cadence that is due again", () => {
+  const later = new Date("2026-01-03T12:15:00.000Z");
+  const work = planTick(
+    parseSchedule({ friction: "15m", errors: "24h" }),
+    emptyLedger({ friction: { lastPatrolAt: now, lastKickAt: null } }),
+    [],
+    later,
+  );
+  assert.deepEqual(pickTickWork(work, { scouts: { friction: { lastPatrolAt: now } } }), {
+    scout: "errors",
+    origin: "patrol",
+  });
+});
+
+test("a kick is not starved by a shorter due cadence", () => {
+  const later = new Date("2026-01-03T12:15:00.000Z");
+  const work = planTick(
+    parseSchedule({ friction: "15m", errors: "24h" }),
+    emptyLedger({ friction: { lastPatrolAt: now, lastKickAt: null } }),
+    ["errors"],
+    later,
+  );
+  assert.deepEqual(pickTickWork(work, { scouts: { friction: { lastPatrolAt: now } } }), {
+    scout: "errors",
+    origin: "patrol+kick",
+  });
+});
+
+test("status survives a host unit with no parsed interval", () => {
+  const lines = [];
+  const log = console.log;
+  console.log = (text) => { lines.push(String(text)); };
+  try {
+    printScheduleStatus({
+      policy: { scouts: [] },
+      ledger: emptyLedger(),
+      host: { kind: "launchd", installed: true, tickEvery: null },
+      next: [],
+      pendingKicks: [],
+    });
+  } finally {
+    console.log = log;
+  }
+  assert.match(lines.join("\n"), /interval unknown/);
+});
+
+test("launchctl bootstrap failure throws", () => {
+  const dir = tmp();
+  initConfig();
+  const home = process.env.HOME;
+  process.env.HOME = dir;
+  try {
+    assert.throws(
+      () => writeHost({
+        repo: dir,
+        bin: ["/usr/bin/node", "tick"],
+        tickEvery: { minutes: 15 },
+        platform: "darwin",
+        probes: {
+          run(bin, args) {
+            if (bin === "launchctl" && args[0] === "bootstrap") return { status: 1, stderr: "denied" };
+            return { status: 0, stdout: "", stderr: "" };
+          },
+        },
+      }),
+      /launchctl bootstrap failed/,
+    );
+  } finally {
+    process.env.HOME = home;
+  }
+});
+
+test("crontab write failure throws", () => {
+  const dir = tmp();
+  initConfig();
+  assert.throws(
+    () => writeHost({
+      repo: dir,
+      bin: ["/usr/bin/node", "tick"],
+      tickEvery: { minutes: 15 },
+      platform: "linux",
+      probes: {
+        run(bin, args) {
+          if (bin === "crontab" && args[0] === "-l") return { status: 0, stdout: "", stderr: "" };
+          return { status: 1, stderr: "denied" };
+        },
+      },
+    }),
+    /crontab - failed/,
+  );
+});
+
+test("crontab -l no crontab is empty; other read errors throw", () => {
+  const dir = tmp();
+  initConfig();
+  const empty = hostStore();
+  empty.probes.run = (bin, args, opts = {}) => {
+    if (bin === "crontab" && args[0] === "-l") return { status: 1, stderr: "crontab: no crontab for user" };
+    if (bin === "crontab" && args[0] === "-") {
+      empty.store.text = opts.input || "";
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    return { status: 0, stdout: "", stderr: "" };
+  };
+  assert.deepEqual(
+    writeHost({ repo: dir, bin: ["/usr/bin/node", "tick"], tickEvery: { minutes: 15 }, platform: "linux", probes: empty.probes }),
+    { kind: "cron", installed: true, tickEvery: { minutes: 15 } },
+  );
+  assert.match(empty.store.text, /PATH=/);
+  assert.throws(
+    () => writeHost({
+      repo: dir,
+      bin: ["/usr/bin/node", "tick"],
+      tickEvery: { minutes: 16 },
+      platform: "linux",
+      probes: { run() { return { status: 2, stderr: "auth failed" }; } },
+    }),
+    /crontab -l failed/,
   );
 });
