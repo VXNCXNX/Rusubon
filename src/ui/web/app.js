@@ -1,4 +1,4 @@
-import { escape, ended, labels, duration, modelLabel, permissionLabel, modelControls, readiness, runList, findingList, reportView, prModelSummary, connectionViews, jobView, activityView } from "/views.js";
+import { escape, ended, labels, duration, modelLabel, modelControls, readiness, runList, findingList, reportView, prModelSummary, connectionViews, jobView, activityView } from "/views.js";
 import { syncRequests } from "/requests.js";
 import { createRefreshScheduler } from "/refresh.js";
 import { updateMarkup, enterPage } from "/interface.js";
@@ -72,7 +72,7 @@ function renderState() {
   updateMarkup($("model-controls"), modelControls(state, selection));
   updateMarkup($("spec-model-controls"), modelControls(state, specSelection, "spec"));
   updateMarkup($("implementation-model-controls"), modelControls(state, implementationSelection, "implementation"));
-  $("spec-help").textContent = specSelection.model === "claude-fable-5-1" ? "Fable 5.1 is selected for research and spec creation only. It can cost more than the other choices." : "Sol, Astra, or Fable 5.1 for deeper research, requirements, and design. Choose the effort separately.";
+  $("spec-help").textContent = specSelection.model === "claude-fable-5-1" ? "Fable 5.1 is for spec creation only and can cost more." : "";
   $("pr-readiness").textContent = prReady() ? "Ready for a finding or issue" : busy() ? "A run is active" : "Connect both selected agents and choose supported efforts in Setup.";
   for (const summary of document.querySelectorAll("[data-pr-models]")) summary.textContent = prModelSummary(specSelection, implementationSelection);
   const ready = readiness(state, selection);
@@ -82,7 +82,7 @@ function renderState() {
   $("scope-error").textContent = investigation.error; $("scope-error").hidden = !investigation.error;
   $("launch-summary").textContent = investigation.scope ? `${investigation.scope.options.checks.length} checks · ${investigation.scope.paths.length} ${investigation.scope.paths.length === 1 ? "path" : "paths"} · ${windowLabel(investigation.scope.window)}` : "";
   $("launch-scout").disabled = !ready.ready || !investigation.scope || submitting;
-  $("model-help").textContent = `${permissionLabel(w.config.permissionMode)} permissions · ${selection.effort === "ultra" ? "ultra enables automatic delegation in the connected Codex runner." : "Model and effort are checked against your connected runner before each phase."}`;
+  $("model-help").textContent = selection.effort === "ultra" ? "Ultra enables automatic delegation in the connected Codex runner." : "";
   updateMarkup($("run-list"), runList(state.jobs));
   updateMarkup($("finding-list"), findingList(filter === "open" ? state.reports : state.archived, filter === "archived"));
   updateMarkup($("connections"), connectionViews(state));

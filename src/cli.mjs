@@ -6,9 +6,12 @@ import { collectChecks, formatDoctor } from "./doctor.mjs";
 import { listInbox, printInbox, printShow, showReport } from "./inbox.mjs";
 import { remember } from "./memory.mjs";
 import { runPr } from "./pr.mjs";
+import { checkReport } from "./check.mjs";
 import { listSkills, runSkill } from "./run.mjs";
+import { listScouts } from "./scout-scope.mjs";
 import { RUNNERS } from "./runners.mjs";
 import { withRepoLock } from "./lock.mjs";
+import { formatTick, installSchedule, printScheduleStatus, scheduleStatus, tick, uninstallSchedule } from "./schedule.mjs";
 
 const HELP = `Rusubon — 留守番 — product scouts for PostHog, on your own agent.
 
@@ -19,7 +22,13 @@ Usage:
   rusubon context draft [--about "…"] [--force]
                                        propose context.md (placeholder stays)
   rusubon doctor                       preflight before a run
-  rusubon run <skill>                  run a scout (friction)
+  rusubon run <skill>                  run a scout (${listScouts().map(row => row.name).join(", ")})
+  rusubon tick [--kick <scout>] [--dry-run]
+                                       patrol due scouts; one run per process
+  rusubon schedule install [--every 15m] [--remove]
+                                       write launchd or crontab that calls tick
+  rusubon schedule status              cadence, ledger, host, pending kicks
+  rusubon check <slug>                 re-run a report's HogQL; append still_live or quiet
   rusubon pr <slug|#N|url> [--issue|--report]
                                        research, auto-spec, verify; draft PR
   rusubon inbox                        list open reports
@@ -74,12 +83,37 @@ export async function main(argv) {
       return doctorCommand();
     case "run": {
       const skill = rest[0];
-      if (!skill) throw new Error("usage: rusubon run <skill>");
+      if (!skill) throw new Error(`usage: rusubon run <skill>  (${listScouts().map(row => row.name).join(", ")})`);
       if (skill === "research") {
         throw new Error("research is not a scout. launch it with `rusubon pr <slug|issue>`");
       }
       const config = loadConfig();
       return withRepoLock(process.cwd(), () => runSkill(skill, config));
+    }
+    case "tick": {
+      const dry = takeFlag(rest, "dry-run");
+      const kick = takeOption(dry.rest, "kick");
+      if (kick.rest.length) throw new Error("usage: rusubon tick [--kick <scout>] [--dry-run]");
+      const result = await tick(loadConfig(), { kick: kick.value, dryRun: dry.present });
+      console.log(formatTick(result));
+      return result;
+    }
+    case "schedule": {
+      if (rest[0] === "status") return printScheduleStatus(scheduleStatus(loadConfig()));
+      if (rest[0] === "install") {
+        const remove = takeFlag(rest.slice(1), "remove");
+        const every = takeOption(remove.rest, "every");
+        if (every.rest.length) throw new Error("usage: rusubon schedule install [--every 15m] [--remove]");
+        if (remove.present) return uninstallSchedule();
+        return installSchedule({ tickEvery: every.value || "15m" });
+      }
+      throw new Error("usage: rusubon schedule install [--every 15m] [--remove] | rusubon schedule status");
+    }
+    case "check": {
+      const slug = rest[0];
+      if (!slug) throw new Error("usage: rusubon check <slug>");
+      const config = loadConfig();
+      return withRepoLock(process.cwd(), () => checkReport(slug, config));
     }
     case "pr": {
       const issue = takeFlag(rest, "issue");

@@ -12,17 +12,20 @@ submissions fail before writing, including a second check in the worker.
 
 The dashboard uses Claude Code through its Agent SDK or Codex through stdio
 app-server. Scout, spec creator, and implementation have independent runner,
-model, and effort selections. Choices must belong to both the role's product
+model, and effort selections. Dashboard scouts offer `friction` and `errors`. Choices must belong to both the role's product
 allowlist and the connected runner's live catalog. The original six models are
 available to all three roles. Fable 5.1 is opt-in for research/spec creation only;
 Fable 5 remains excluded. An
 unavailable model fails before inference, with no alias or automatic fallback.
 Both PR phase selections are immutable run metadata, including on a rerun.
 The research phase uses the spec creator; implementation reads the validated
-spec in a separate agent phase with its own selection. Claude session review
-uses the saved read model at `low` effort.
+spec in a separate agent phase with its own selection. Claude and Codex session
+review use `read.effort` (default `low`). Claude may use `read.model`. Codex
+reuses the scout model. Cursor reuses the scout model and does not apply
+`read.effort`.
 
-Dashboard scouts require an explicit investigation scope: PostHog project and
+Dashboard scouts require an explicit investigation scope: scout (`friction` or
+`errors`), PostHog project and
 region, complete UTC days, confirmed money paths, enabled checks, and optional
 additional context. Relative periods are 7, 14, or 30 days; custom periods are
 1 to 90 days with an inclusive end date in the UI. The runner uses an exclusive
@@ -118,7 +121,7 @@ Read path (not Claude hooks):
 
 `rusubon decline <slug> --why "…"` moves the report to archive and upserts `memory/noise/<slug>.md`. Resolving later does **not** write a why.
 
-If the index exceeds ~80 keys, friction only sees `pattern`, `noise`, and `dedupe`.
+If the index exceeds ~80 keys, scouts keep `report`, `noise`, `dedupe`, then `pattern`. Cross-scout edits depend on seeing existing `report/` keys.
 
 ## Reports
 
@@ -141,7 +144,7 @@ Body must name the path (and element if known), the step vs that path’s baseli
 
 A URL with no history cannot have a step-change. First sighting of a hot new page is a `pattern/` note, not a report, unless the friction is extreme and corroborated after a session read.
 
-A still-live report on the same surface is an edit (append the fresh window), not a second file. Write `memory/report/<slug>` after filing so the next run finds it.
+A still-live report on the same surface is an edit (append the fresh window), not a second file, including a report filed by another scout. Write `memory/report/<slug>` after filing so the next run finds it.
 
 | Priority | When (friction) |
 | --- | --- |
@@ -149,30 +152,37 @@ A still-live report on the same surface is an edit (append the fresh window), no
 | P2 | Corroborated money-path cluster or broken-experience cohort on a `context.md` URL, after a session read. |
 | P3 | Vision watch-gap (`obs` collapsed, recordings still flow). Do not create a scanner. |
 
+| Priority | When (errors) |
+| --- | --- |
+| P2 | Corroborated `$exception` or broken-experience cluster on a `context.md` URL, after a session read. |
+| P3 | New exception type this window, corroborated, below the P2 volume gate. |
+
 Do not file P0 or P4. If it feels P4, skip. If it feels P0, it is still a P1 cliff.
 
 Do not file if the shape is in `context.md` intentional friction, or a `noise:` / `dedupe:` memory key already covers it.
 
 `rusubon inbox` prints `P2  slug  title`, P1 first.
 
-## Friction run (two phases)
+## Scout run (two phases)
 
-`rusubon run friction` is a command you start. No cron. Leave the laptop open.
+`rusubon run <scout>` and `rusubon tick` start a scout. Tick is the patrol entry. Host install writes launchd or crontab that calls tick. Tick never opens a PR.
 
-On **Claude**, the harness runs the skill twice:
+The harness runs the skill twice when candidates exist:
 
-1. **Phase 1 (SQL)** — capture cliff (P1), Vision watch-gap (P3), `not-in-use`. Also runs rage concentration (14d vs 24h) and the broken-experience cohort if `posthog.session_replay_features` exists. Writes `.rusubon/runs/YYYY-MM-DD-friction-candidates.json`. Does **not** file a money-path cluster.
-2. **Phase 2 (read)** — only if that file has ids. Second Claude process (`read.effort` default `low`, optional `read.model` in `rusubon.json`). Parent spawns sub-agents (~10 ids each). Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor: `.rusubon/memory/dedupe/friction-session-cursor.md`. Skip an id until a newer cheap signal.
+1. **Phase 1 (SQL)** — the scout's cheap aggregates and session qualification. Writes candidates even if `ids` is `[]`. Friction may file P1 capture cliff, P3 Vision watch-gap, or `not-in-use`. Errors may file `not-in-use` when `$exception` is absent. Neither files a P2 cluster here.
+2. **Phase 2 (read)** — only if that file has ids. Second runner process (`read.effort` default `low` for Claude and Codex; Claude may use `read.model`; Codex reuses the scout model; Cursor reuses the scout model and ignores `read.effort`). Parent spawns sub-agents (~10 ids each), or reads sequentially if Task is missing. Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor file: `.rusubon/memory/dedupe/<scout>-session-cursor.md`. Skip an id until a newer cheap signal.
 
-Qualified id: money path from `context.md` in the last 7 days, plus `$rageclick` / `$dead_click` / `$exception` / `$recording_observed`, or a broken-experience row on a money path. Prefer paths whose 24h rage is ≥ ~3× the prior-13-day daily mean. Sort by signal count. Read events + console + `session_replay_features` + replay **metadata** MCP tools if present. Read stored session summaries if present. Never generate summaries. Heatmaps if present; skip if absent. No video. No new Vision scanner.
+Qualified id: money path from `context.md` in the selected window, plus the scout's enabled signals. Friction: `$rageclick` / `$dead_click` / `$exception` / `$recording_observed` or a broken-experience row. Errors: `$exception` or `session_features`. Sort by signal count. Read events + console + `session_replay_features` + replay **metadata** MCP tools if present. Read stored session summaries if present. Never generate summaries. Heatmaps if present; skip if absent. No video. No new Vision scanner.
 
-`$rageclick` fires whether or not the session was recorded. Quantify on events. Corroborate with recordings.
+`$rageclick` and `$exception` fire whether or not the session was recorded. Quantify on events. Corroborate with recordings.
 
 Zero `$recording_observed` in 30d is not `not-in-use` by itself. Failures never write that event. Check `vision-scanners-list` when the tool exists.
 
-**Cursor / Codex:** phase 1 only. Candidates stay unread.
-
 P2 volume gates stay: ≥5 persons / ≥10 sessions.
+
+## Evidence check
+
+`rusubon check <slug>` is a human-launched pass. It does not scout and does not open a PR. The harness refuses a report with no Query HogQL. The runner re-runs that query shape on the latest complete period of the same length (or the last 7 complete UTC days), then appends `## Check YYYY-MM-DD` with `verdict: still_live | quiet`, a new Series table, and the HogQL. A quiet verdict does not archive the report. Official PostHog MCP only.
 
 ## Official PostHog MCP
 
@@ -189,7 +199,9 @@ If those tools are not available in the runner session, write a close-out that s
 | `rusubon init` | you | scaffold + gitignore inbox/runs |
 | `rusubon context draft` | you | propose `context.md` (placeholder stays) |
 | `rusubon doctor` | you | preflight (context, projectId, host us\|eu, runner, MCP) |
-| `rusubon run friction` | you | two-phase scout on Claude (SQL then session read); then inbox |
+| `rusubon run friction` | you | two-phase scout (SQL then session read); then inbox |
+| `rusubon run errors` | you | two-phase exception / broken-experience scout; then inbox |
+| `rusubon check <slug>` | you | re-run the report Query; append still_live or quiet |
 | `rusubon pr <slug\|#N\|url>` | you | research a report or GitHub issue; draft PR only. Never merge |
 | `rusubon inbox` | you | list open reports |
 | `rusubon show <slug>` | you | print a report (open or archived) |

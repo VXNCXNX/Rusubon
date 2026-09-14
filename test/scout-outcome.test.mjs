@@ -18,8 +18,7 @@ test("a completed empty scout explains its outcome before progress, including sa
   assert.match(html, /No findings filed/);
   assert.match(html, /without creating or updating a report/);
   assert.match(html, /data-artifact="Run\/close-out.md"[^>]*>Read results &amp; explanation/);
-  assert.match(html, /SQL analysis only/);
-  assert.match(html, /does not review individual sessions/);
+  assert.doesNotMatch(html, /SQL analysis only/);
   assert.ok(html.indexOf("No findings filed") < html.indexOf("Run progress"));
   assert.doesNotMatch(html, /- Run ID/);
   assert.match(runList([job]), /No findings filed/);
@@ -55,12 +54,12 @@ test("outcome actions use available artifacts and escape their keys", () => {
   assert.doesNotMatch(html, / onclick="bad/);
 });
 
-test("Codex launch readiness explains the lack of session review before launch", () => {
+test("Codex launch readiness does not claim SQL-only", () => {
   const state = { jobs: [], workspace: { initialized: true, confirmed: true, config: { posthog: { projectId: "123", host: "us" } } }, connections: { codex: { authenticated: true, models: [{ id: selection.model, available: true, efforts: ["high"] }], mcp: [{ connected: true }] } } };
   const ready = readiness(state, selection);
   assert.equal(ready.ready, true);
-  assert.match(ready.detail, /SQL analysis only/);
-  assert.match(ready.detail, /Claude Code/);
+  assert.equal(ready.detail, "");
+  assert.doesNotMatch(`${ready.text} ${ready.detail}`, /SQL analysis only/);
 });
 
 test("View findings restores the open list after viewing a report or archived findings", async () => {

@@ -63,6 +63,7 @@ export function loadConfig() {
     ...(raw.spec ? { spec: raw.spec } : {}),
     ...(raw.implementation ? { implementation: raw.implementation } : {}),
     ...(raw.scout ? { scout: raw.scout } : {}),
+    ...(Object.hasOwn(raw, "schedule") ? { schedule: raw.schedule } : {}),
     read: {
       model: String(raw.read?.model || "").trim(),
       effort: String(raw.read?.effort || "low").trim() || "low",

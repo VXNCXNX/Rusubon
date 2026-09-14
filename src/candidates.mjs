@@ -1,12 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cwd } from "./paths.mjs";
-import { pathMatches, signalTypes } from "./scout-scope.mjs";
+import { pathMatches, scoutCursorKey, signalTypes } from "./scout-scope.mjs";
 
 export const READ_MAX_SESSIONS = 100;
 export const READ_MAX_MS = 45 * 60 * 1000;
 export const READ_BATCH = 10;
-export const SESSION_CURSOR_KEY = "dedupe/friction-session-cursor";
+export const SESSION_CURSOR_KEY = scoutCursorKey("friction");
 
 export function candidatesRel(skillName, day = new Date()) {
   return `.rusubon/runs/${day.toISOString().slice(0, 10)}-${skillName}-candidates.json`;
@@ -62,7 +62,6 @@ export function scopedCandidates(raw, scope) {
 }
 
 export function shouldRunPhase2(config, candidates, closeBody) {
-  if ((config?.runner || "claude") !== "claude") return false;
   if (!candidates?.ids?.length) return false;
   if (closeBody && String(closeBody).trimStart().toLowerCase().startsWith("no posthog tools")) {
     return false;

@@ -111,6 +111,7 @@ In Runs, choose the PostHog project in Setup, then set the investigation:
 
 | Choice | What it controls |
 | --- | --- |
+| Scout | Friction (rage, capture, replay analysis) or Errors (`$exception` and recorded failures). |
 | Period | Last 7, 14, or 30 complete UTC days, or custom dates up to 90 days. The previous period has the same duration. Today is excluded. |
 | Focus | All confirmed money paths or a subset. Put URLs or paths such as `/checkout` under `# Money paths` in product context. Descendants, `:id` segments, and explicit `*` segments are supported. |
 | What to inspect | Rage/dead clicks, errors/failed requests, recording coverage, and existing replay analysis. At least one check is required. |
@@ -162,7 +163,8 @@ Reported Claude model switches and effort mismatches stop the phase. Runtime
 hooks verify applied effort when the initial message omits it; a phase without
 effective model and effort evidence is not accepted as successful.
 Claude's session-review phase uses the separately saved Sonnet 5 or
-Opus 5 model at `low`; Codex scouts stop after SQL analysis.
+Opus 5 model at `low`. Codex and Cursor session review reuse the scout
+model at `low`.
 
 In `rusubon.json`, the top-level `runner`, `model`, and `effort` configure the
 scout. The `spec` and `implementation` objects each accept their own `runner`,
@@ -288,6 +290,11 @@ The PostHog key lives in the runner's config, never in the repo.
 ```bash
 rusubon doctor
 rusubon run friction
+rusubon run errors
+rusubon tick
+rusubon schedule install
+rusubon schedule status
+rusubon check <slug>
 rusubon inbox
 rusubon show <slug>
 rusubon decline <slug> --why "intentional EU checkout gate"
@@ -295,7 +302,9 @@ rusubon remember pattern/capture-baseline still quiet week of …
 rusubon pr <slug>
 ```
 
-`run` on Claude is two passes: SQL first (capture, Vision, rage concentration), then a low-effort read of sessions that hit a money path *and* a cheap signal (rage, dead click, exception, Vision tag). Sub-agents scan those ids in parallel. The parent writes 0–3 reports. A report is a quantified title, a step vs that path's baseline, and a Series table of numbers already queried. Cap 100 sessions or 45 minutes. Cursor and Codex stop after SQL.
+`rusubon tick` starts the same scout as `run` when a cadence is due. `rusubon schedule install` writes one LaunchAgent or user crontab per product checkout. That timer calls `tick`. `rusubon pr` still has no cron.
+
+`run` is two passes: SQL first, then a low-effort read of sessions that hit a money path *and* a cheap signal. Sub-agents scan those ids in parallel, or sequentially if Task is missing. The parent writes 0–3 reports. A report is a quantified title, a step vs that path's baseline, and a Series table of numbers already queried. Cap 100 sessions or 45 minutes. `rusubon run errors` does the same for `$exception` clusters. `rusubon check <slug>` re-runs a report's Query and appends still live or quiet.
 
 `run` ends with a harness block (duration, `mcp=ok|missing`, reports, memory writes, close-out) and the inbox. Read a finding with `show`. Archive it with `decline --why`.
 
@@ -312,6 +321,8 @@ rusubon.json                       # committed: projectId + host (us|eu) + runne
 .rusubon/runs/<run-id>/            # gitignored: PR prompts, results, logs, receipt and close-out
 .rusubon/runs/ui-<uuid>/           # gitignored: dashboard job, events, scout artifacts
 .rusubon/runs/*.lock              # gitignored: local dashboard and workflow ownership
+.rusubon/runs/patrol.json         # gitignored: patrol ledger
+.rusubon/runs/kicks/<scout>.json  # gitignored: pending kicks
 ```
 
 ## Config
@@ -328,7 +339,9 @@ rusubon.json                       # committed: projectId + host (us|eu) + runne
 
 `host` is `us` or `eu` (or `https://us.posthog.com` / `https://eu.posthog.com`). Match the region the project lives in. There is no default.
 
-`read.effort` / `read.model` apply to the session-read pass only (Claude). Omit `read.model` to keep the CLI default model.
+Optional `schedule` maps a scout to an interval such as `24h` or a 5-field UTC cron. `rusubon schedule install` writes `{ "friction": "24h", "errors": "24h" }` when the key is missing. An explicit `{}` stays empty.
+
+`read.effort` (default `low`) applies to the session-read pass for Claude and Codex. `read.model` is Claude-only. Cursor reuses the scout model and ignores `read.effort`. Omit `read.model` to keep the CLI default model.
 
 | `runner` | What it uses | Bills |
 | --- | --- | --- |
@@ -347,6 +360,7 @@ If the runner session has no official PostHog MCP tools, the skill writes a clos
 | Skill | Job |
 | --- | --- |
 | `friction` | Capture cliffs + money-path clusters. Findings are `requires_human_input`. Launch with `rusubon run friction`. |
+| `errors` | `$exception` and broken-experience clusters on money paths. Launch with `rusubon run errors`. |
 | `research` | Human-launched via `rusubon pr <slug|#N|url>`. Draft PR only. Never merge. |
 | `spec` | Auto-mode requirements, design and tasks between actionable research and implementation. |
 
@@ -394,7 +408,7 @@ fresh run, commit the work you want to keep or use a clean worktree.
 
 - A PostHog Cloud feature, or a fork you self-host
 - A standing Replay Vision / Gemini scanner
-- An unattended PR publisher. A person launches each research-to-PR run. No cron or auto-merge.
+- An unattended PR publisher. A person launches each research-to-PR run. No cron or auto-merge. Patrol (`rusubon tick`) never opens a PR.
 - A hosted AI reseller
 
 ## License
