@@ -13,7 +13,7 @@ export const MEMORY_PREFIXES = [
   "report",
 ];
 
-export const FRICTION_INDEX_PREFIXES = ["pattern", "noise", "dedupe"];
+export const SCOUT_INDEX_PREFIXES = ["report", "noise", "dedupe", "pattern"];
 export const INDEX_CAP = 80;
 
 export function rusubonDir() {
@@ -42,4 +42,12 @@ export function archiveDir() {
 
 export function runsDir() {
   return resolve(rusubonDir(), "runs");
+}
+
+export function patrolPath() {
+  return resolve(runsDir(), "patrol.json");
+}
+
+export function kicksDir() {
+  return resolve(runsDir(), "kicks");
 }

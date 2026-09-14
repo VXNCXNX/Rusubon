@@ -2,12 +2,31 @@
 // exclusive end boundary, so both phases use the same reproducible window.
 const DAY = 86_400_000;
 export const SCOUT_CHECKS = [
-  { id: "clicks", label: "Rage & dead clicks", detail: "Click events, then qualified session evidence." },
-  { id: "errors", label: "Errors & failed requests", detail: "Exception events and recorded session features." },
-  { id: "coverage", label: "Recording coverage", detail: "Pageviews compared with recording metadata." },
-  { id: "replay", label: "Existing replay analysis", detail: "Stored replay signals and summaries, when available." },
+  { id: "clicks", label: "Rage & dead clicks" },
+  { id: "errors", label: "Errors & failed requests" },
+  { id: "coverage", label: "Recording coverage" },
+  { id: "replay", label: "Existing replay analysis" },
 ];
-export const DEFAULT_SCOUT = { period: "7d", focus: "all", checks: SCOUT_CHECKS.map(row => row.id), note: "" };
+export const SCOUT_SKILLS = {
+  friction: { label: "Friction", checks: ["clicks", "errors", "coverage", "replay"] },
+  errors: { label: "Errors", checks: ["errors"] },
+};
+export const DEFAULT_SCOUT = { skill: "friction", period: "7d", focus: "all", checks: SCOUT_CHECKS.map(row => row.id), note: "" };
+
+export function resolveScout(input) {
+  const name = typeof input === "string" ? input : input?.skill || "friction";
+  const spec = SCOUT_SKILLS[name];
+  if (!spec) throw new Error(`Unknown scout '${name}'. have: ${Object.keys(SCOUT_SKILLS).join(", ")}`);
+  return { name, ...spec };
+}
+
+export function listScouts() {
+  return Object.entries(SCOUT_SKILLS).map(([name, spec]) => ({ name, ...spec }));
+}
+
+export function scoutCursorKey(skill) {
+  return `dedupe/${resolveScout(skill).name}-session-cursor`;
+}
 
 export function signalTypes(checks) {
   return [...(checks.includes("clicks") ? ["$rageclick", "$dead_click"] : []), ...(checks.includes("errors") ? ["$exception", "session_features"] : []), ...(checks.includes("replay") ? ["$recording_observed"] : [])];
@@ -38,12 +57,16 @@ export function moneyPaths(context) {
 
 export function scoutOptions(input = DEFAULT_SCOUT) {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Choose the scout's investigation settings.");
-  const { period = "7d", focus = "all", checks = DEFAULT_SCOUT.checks, note = "" } = input;
+  const scout = resolveScout(input.skill || "friction");
+  const { period = "7d", focus = "all", note = "" } = input;
+  const checks = Object.hasOwn(input, "checks") ? input.checks : scout.checks;
   if (!["7d", "14d", "30d", "custom"].includes(period)) throw new Error("Choose 7, 14, or 30 days, or a custom period.");
   if (focus !== "all" && (!Array.isArray(focus) || !focus.length || focus.length > 100 || focus.some(path => typeof path !== "string" || path.length > 300))) throw new Error("Choose at least one confirmed money path.");
-  if (!Array.isArray(checks) || !checks.length || checks.some(id => !SCOUT_CHECKS.some(row => row.id === id))) throw new Error("Choose at least one supported check to inspect.");
+  if (!Array.isArray(checks) || checks.some(id => typeof id !== "string")) throw new Error("Choose at least one supported check to inspect.");
+  const next = [...new Set(checks.filter(id => scout.checks.includes(id) && SCOUT_CHECKS.some(row => row.id === id)))];
+  if (!next.length) throw new Error("Choose at least one supported check to inspect.");
   if (typeof note !== "string" || note.length > 2000) throw new Error("Keep additional context to 2,000 characters.");
-  return { period, ...(period === "custom" ? { startDate: input.startDate, endDate: input.endDate } : {}), focus: focus === "all" ? "all" : [...new Set(focus)], checks: [...new Set(checks)], note: note.trim() };
+  return { skill: scout.name, period, ...(period === "custom" ? { startDate: input.startDate, endDate: input.endDate } : {}), focus: focus === "all" ? "all" : [...new Set(focus)], checks: next, note: note.trim() };
 }
 
 function utcDate(value) {

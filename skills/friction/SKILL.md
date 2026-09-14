@@ -18,7 +18,7 @@ Findings are **investigations** (`requires_human_input`). Never open a PR from t
 
 Do not create Replay Vision scanners. Do not recommend creating one. Do not call `vision-scanners-create` or session-summary generation. Do not watch video / frames.
 
-The harness runs this skill in **two phases** on Claude (`rusubon run friction`). Cursor/Codex get phase 1 only.
+The harness runs this skill in **two phases**. Every runner that reaches phase 2 may file P2. If sub-agents are missing, read sequentially.
 
 ## Phase 1 — SQL
 
@@ -94,7 +94,7 @@ Official PostHog MCP only. Never log `phc_` tokens. Never call a PostHog HTTP AP
 | Rage rises everywhere with traffic | Baseline. Leave it. |
 | Same intent tag concentrating on one money path, persons ≥ 5 | Cluster. Corroborate with 2–3 recordings. |
 | Errors after click or failed requests on one URL, step vs that URL's prior window | Broken-experience cohort. Failed-request-only is ad-blocker-prone. |
-| `$exception` on a money path with session evidence | File only the user-impact angle. |
+| `$exception` on a money path with session evidence | Leave the cluster to the errors scout. File only a user-impact angle if it changes the friction story. |
 | One person, or &lt; 10 sessions / &lt; 5 persons | Storm / wobble. `noise/` |
 | New URL with no history | `pattern/` until it has a baseline, unless friction is extreme and corroborated. |
 | Vision `obs_7d` collapsed while recordings flow | Watch gap (P3). Bundle all silent scanners into one note. Do not create a replacement scanner. |

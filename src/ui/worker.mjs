@@ -98,9 +98,13 @@ async function runJob(input) {
       writeLocal(repo, `.rusubon/runs/${input.id}/close-out.md`, "no PostHog tools\n\nConnect the official PostHog MCP on this runner before scouting.\n");
       throw new Error("no PostHog tools. Connect the official PostHog MCP on this runner.");
     }
-    config.read = { model: input.readModel || config.read.model || "claude-sonnet-5", effort: "low" };
-    if (selection.runner === "claude") validateSelection({ runner: "claude", ...config.read }, connection.models);
-    return runSkill("friction", config, probes, { run, runId: input.id, onEvent: emit, scope: input.scoutScope });
+    if (selection.runner === "claude") {
+      config.read = { model: input.readModel || config.read.model || "claude-sonnet-5", effort: "low" };
+      validateSelection({ runner: "claude", ...config.read }, connection.models);
+    } else {
+      config.read = { model: selection.model, effort: "low" };
+    }
+    return runSkill(input.scoutScope?.options?.skill || "friction", config, probes, { run, runId: input.id, onEvent: emit, scope: input.scoutScope });
   }
   if (input.kind === "context") return draftContext({ config, about: input.about, run });
   if (input.kind === "pr") {

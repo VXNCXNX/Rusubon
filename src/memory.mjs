@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { FRICTION_INDEX_PREFIXES, INDEX_CAP, MEMORY_PREFIXES, memoryDir } from "./paths.mjs";
+import { INDEX_CAP, MEMORY_PREFIXES, SCOUT_INDEX_PREFIXES, memoryDir } from "./paths.mjs";
 
 const KEY = /^(pattern|noise|addressed|dedupe|not-in-use|report)\/([a-z0-9][a-z0-9-]*)$/;
 
@@ -66,12 +66,16 @@ export function listMemory(prefixes = MEMORY_PREFIXES) {
 
 export function formatIndex(skillName, cap = INDEX_CAP) {
   let entries = listMemory(MEMORY_PREFIXES);
-  if (entries.length > cap && skillName === "friction") {
-    entries = listMemory(FRICTION_INDEX_PREFIXES);
-  }
   let clipped = false;
   if (entries.length > cap) {
-    entries = entries.slice(0, cap);
+    entries = [];
+    for (const prefix of SCOUT_INDEX_PREFIXES) {
+      for (const item of listMemory([prefix])) {
+        if (entries.length >= cap) break;
+        entries.push(item);
+      }
+      if (entries.length >= cap) break;
+    }
     clipped = true;
   }
   if (!entries.length) return "(empty)";

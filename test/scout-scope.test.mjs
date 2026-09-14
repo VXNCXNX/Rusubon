@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { trashFixture } from "./helpers/cleanup.mjs";
-import { DEFAULT_SCOUT, moneyPaths, pathMatches, resolveScoutScope, scoutOptions, scoutWindow, windowLabel } from "../src/scout-scope.mjs";
+import { DEFAULT_SCOUT, listScouts, moneyPaths, pathMatches, resolveScout, resolveScoutScope, scoutCursorKey, scoutOptions, scoutWindow, windowLabel } from "../src/scout-scope.mjs";
 import { scopedQueries } from "../src/scout-queries.mjs";
 import { scopedCandidates } from "../src/candidates.mjs";
 import { runSkill } from "../src/run.mjs";
@@ -71,7 +71,7 @@ test("scope validation requires a supported check, path selection, and bounded c
 });
 
 test("selected checks produce only their bounded SQL with numeric UTC timestamps and path predicates", () => {
-  const expected = { clicks: ["traffic", "clicks", "candidates"], errors: ["traffic", "exceptions", "broken-sessions", "candidates", "feature-candidates"], coverage: ["traffic", "capture-presence", "capture-ratio"], replay: ["traffic", "replay-signals", "replay-candidates"] };
+    const expected = { clicks: ["traffic", "clicks", "candidates"], errors: ["traffic", "exceptions", "exception-types", "broken-sessions", "candidates", "feature-candidates"], coverage: ["traffic", "capture-presence", "capture-ratio"], replay: ["traffic", "replay-signals", "replay-candidates"] };
   for (const [check, ids] of Object.entries(expected)) {
     const s = { ...scope(), options: { ...opts, checks: [check] } }, rows = scopedQueries(s);
     assert.deepEqual(rows.map(row => row.id), ids);
@@ -205,4 +205,18 @@ test("repeated scoped CLI runs isolate artifacts and cannot reuse a previous can
     if (omitCandidates) await assert.rejects(operation, /did not write scoped candidates/); else await operation;
   }
   assert.notEqual(paths[0], paths[1]);
+});
+
+test("scout catalog matches bundled skills and constrains checks", () => {
+  assert.deepEqual(listScouts().map(row => row.name), ["friction", "errors"]);
+  assert.equal(resolveScout("errors").label, "Errors");
+  assert.equal(scoutCursorKey("errors"), "dedupe/errors-session-cursor");
+  assert.throws(() => resolveScout("research"), /Unknown scout/);
+  assert.deepEqual(scoutOptions({ skill: "errors", checks: ["clicks", "errors", "coverage"], focus: "all" }).checks, ["errors"]);
+  assert.throws(() => scoutOptions({ skill: "errors", checks: ["clicks"], focus: "all" }), /supported check/);
+  for (const scout of listScouts()) {
+    const manifest = JSON.parse(readFileSync(join(fileURLToPath(new URL("../skills", import.meta.url)), scout.name, "scout.json"), "utf8"));
+    assert.deepEqual(manifest.checks, scout.checks);
+    assert.equal(manifest.label, scout.label);
+  }
 });

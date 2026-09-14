@@ -21,7 +21,11 @@ export function acquireRepoLock(repo, name = "run.lock") {
     if (!Number.isInteger(old.pid) || old.pid <= 0) throw new Error(`Invalid run lock. Inspect .rusubon/runs/${name} before launching.`);
     let alive = true;
     try { process.kill(old.pid, 0); } catch (failure) { if (failure.code === "ESRCH") alive = false; }
-    if (alive) throw new Error(name === "ui.lock" ? "A dashboard is already running for this repository. Use its existing URL." : "A run is already active in this repository. Stop it or wait for it to finish.");
+    if (alive) {
+      const error = new Error(name === "ui.lock" ? "A dashboard is already running for this repository. Use its existing URL." : "A run is already active in this repository. Stop it or wait for it to finish.");
+      error.code = name === "ui.lock" ? "UI_LOCKED" : "RUN_LOCKED";
+      throw error;
+    }
     // Serialize stale-lock recovery so one contender cannot unlink another's new lock.
     const recovery = `${path}.recovery`;
     try { writeFileSync(recovery, String(process.pid), { flag: "wx", mode: 0o600 }); } catch { throw new Error(`Lock recovery is in progress. If interrupted, inspect ${recovery}.`); }

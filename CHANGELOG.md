@@ -23,15 +23,17 @@ has been published yet.
 - Findings saved as Markdown with quantified evidence. Humans can decline a
   finding or launch research, spec creation, implementation, and a verified draft
   PR in a separate worktree. No automatic merge or deployment.
-- CLI scouting, context drafting, inbox review, and memory, alongside the dashboard.
+- CLI scouting (`friction`, `errors`), `rusubon tick` patrol, `rusubon schedule` host install, evidence checks, context drafting, inbox review, and memory, alongside the dashboard.
 
 ### Preview limits
 
 - macOS, Linux, and Windows through WSL. Native Windows process supervision is
-  not supported.
+  not supported. Patrol host install writes a LaunchAgent or a user crontab. It
+  does not write systemd, and it throws on native Windows.
 - PostHog Cloud projects in US or EU regions, through the official MCP only.
-- Claude scouts support SQL analysis and qualified session review. Codex and
-  Cursor scouts stop after SQL analysis. Cursor has no dashboard connection.
+- Claude, Codex, and Cursor scouts run SQL analysis and qualified session
+  review when candidates exist. Cursor has no dashboard connection.
+- `errors` scout and `rusubon check <slug>` for re-running a report's HogQL.
 - Model availability depends on the installed runner and account. Optional
   recording and replay evidence may be unavailable for a project.
 - Automated tests and browser QA cover the dashboard and scope handoff. A fresh

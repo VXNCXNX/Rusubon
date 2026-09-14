@@ -22,11 +22,11 @@ import { POSTHOG_CLOUD, initConfig, loadConfig, pkgRoot, resolveHost } from "../
 import { PLACEHOLDER, assertContextReady } from "../src/context.mjs";
 import { decline } from "../src/decline.mjs";
 import { assertReady, collectChecks, collectPrChecks, formatDoctor, posthogMcpOk } from "../src/doctor.mjs";
-import { formatInboxLine, listInbox, parseReport, showReport } from "../src/inbox.mjs";
+import { formatInboxLine, formatOpenReports, listInbox, parseReport, showReport } from "../src/inbox.mjs";
 import { formatIndex, parseKey, remember } from "../src/memory.mjs";
 import { buildPrPrompt } from "../src/pr.mjs";
 import { parseSource, resolveSource } from "../src/pr-source.mjs";
-import { buildPrompt, loadSkill } from "../src/run.mjs";
+import { buildPrompt, isScout, loadSkill } from "../src/run.mjs";
 import { formatDuration, formatRunSummary, snapshotState, summarizeRun } from "../src/summary.mjs";
 
 const prev = process.cwd();
@@ -117,12 +117,12 @@ test("run refuses placeholder context", async () => {
   await assert.rejects(() => main(["run", "friction"]), /projectId/);
 });
 
-test("remember upserts; friction index restricts prefixes over cap", () => {
+test("remember upserts; clipped index keeps report keys", () => {
   tmp();
   initConfig();
   remember("pattern/capture-baseline", "still quiet this week");
   remember("noise/paywall-eu", "intentional EU checkout gate");
-  remember("report/old-note", "should not appear in friction index");
+  remember("report/old-note", "still-live checkout cluster");
   const again = remember("pattern/capture-baseline", "refreshed baseline");
   assert.match(readFileSync(again.path, "utf8"), /refreshed baseline/);
   const index = formatIndex("friction");
@@ -130,8 +130,9 @@ test("remember upserts; friction index restricts prefixes over cap", () => {
   assert.match(index, /noise\/paywall-eu/);
   assert.match(index, /report\/old-note/);
   const tight = formatIndex("friction", 2);
-  assert.match(tight, /pattern\/capture-baseline/);
-  assert.doesNotMatch(tight, /report\/old-note/);
+  assert.match(tight, /report\/old-note/);
+  assert.match(tight, /noise\/paywall-eu/);
+  assert.doesNotMatch(tight, /pattern\/capture-baseline/);
 });
 
 test("decline archives the report and writes memory/noise", () => {
@@ -172,6 +173,7 @@ test("buildPrompt injects context and memory index", () => {
   assert.match(prompt, /session-recording-summaries-list/);
   assert.match(prompt, /Series markdown table/);
   assert.match(prompt, /Query section with that HogQL/);
+  assert.match(prompt, /Open reports/);
   assert.doesNotMatch(prompt, /scratchpad\.md/);
   assert.doesNotMatch(prompt, /inbox\/findings/);
 });
@@ -184,7 +186,7 @@ test("report template has a Series table", () => {
   assert.match(text, /```sql/);
 });
 
-test("phase 2 prompt gets candidates; shouldRunPhase2 is Claude-only", () => {
+test("phase 2 prompt gets candidates; shouldRunPhase2 is runner-agnostic", () => {
   tmp();
   initConfig();
   fillContext();
@@ -208,9 +210,18 @@ test("phase 2 prompt gets candidates; shouldRunPhase2 is Claude-only", () => {
   assert.match(p2, /session-recording-summaries-list/);
   assert.match(p2, /"sessionId": "bbb"/);
   assert.equal(shouldRunPhase2(cfg, candidates, "# ok\n"), true);
-  assert.equal(shouldRunPhase2({ ...cfg, runner: "cursor" }, candidates, "# ok\n"), false);
+  assert.equal(shouldRunPhase2({ ...cfg, runner: "cursor" }, candidates, "# ok\n"), true);
+  assert.equal(shouldRunPhase2({ ...cfg, runner: "codex" }, candidates, "# ok\n"), true);
   assert.equal(shouldRunPhase2(cfg, { ids: [] }, "# ok\n"), false);
   assert.equal(shouldRunPhase2(cfg, candidates, "no PostHog tools\n"), false);
+});
+
+test("open reports list surfaces for every scout", () => {
+  tmp();
+  initConfig();
+  mkdirSync(".rusubon/inbox/reports", { recursive: true });
+  writeFileSync(".rusubon/inbox/reports/checkout-rage.md", "# Rage on /checkout\n\npriority: P2\npriority_explanation: 12 persons.\nactionability: requires_human_input\n");
+  assert.match(formatOpenReports(), /P2  checkout-rage  Rage on \/checkout  \[\/checkout\]/);
 });
 
 test("inbox lists P1 before P3 as priority slug title", () => {
@@ -499,6 +510,24 @@ test("resolveSource issue mismatches repo", () => {
     () => resolveSource(parseSource("other/repo#9"), probes),
     /run from that checkout/,
   );
+});
+
+test("errors is a bundled scout and spec is not", () => {
+  assert.equal(isScout("friction"), true);
+  assert.equal(isScout("errors"), true);
+  assert.equal(isScout("spec"), false);
+  assert.equal(isScout("research"), false);
+  tmp();
+  initConfig();
+  fillContext();
+  const prompt = buildPrompt(loadSkill("errors"), {
+    posthog: { projectId: "123", host: "https://us.posthog.com" },
+    runner: "codex",
+  });
+  assert.match(prompt, /error-tracking/i);
+  assert.match(prompt, /Phase: 1 of 2/);
+  assert.match(prompt, /dedupe\/errors-session-cursor/);
+  assert.doesNotMatch(prompt, /cursor\/codex stop after phase 1/i);
 });
 
 test("friction buildPrompt still says no PR / no GitHub", () => {

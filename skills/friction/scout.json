@@ -1,0 +1,4 @@
+{
+  "label": "Friction",
+  "checks": ["clicks", "errors", "coverage", "replay"]
+}
