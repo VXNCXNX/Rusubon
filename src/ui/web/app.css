@@ -242,7 +242,10 @@ dialog .prose { font-size: 15px; }
   :root { --side: 168px; }
 }
 @media (max-width: 900px) {
-  .shell { grid-template-columns: 1fr; }
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .bar { flex-wrap: wrap; height: auto; min-height: var(--bar); padding-top: 8px; padding-bottom: 8px; row-gap: 4px; }
+  .bar .tabs { align-self: auto; height: 32px; }
+  .bar-end { flex-wrap: wrap; }
   .side { position: static; height: auto; flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; border-right: 0; border-bottom: 1px solid var(--rule); overflow-x: auto; }
   .repo { display: none; }
   .side nav { display: flex; gap: 2px; margin-left: 6px; }
