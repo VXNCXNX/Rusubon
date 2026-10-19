@@ -170,7 +170,8 @@ test("buildPrompt injects context and memory index", () => {
   assert.match(prompt, /session_replay_features/);
   assert.match(prompt, /rageclicks_24h/);
   assert.match(prompt, /argMinMerge/);
-  assert.match(prompt, /session-recording-summaries-list/);
+  assert.match(prompt, /vision-observations-list/);
+  assert.doesNotMatch(prompt, /session-recording-summaries-list/);
   assert.match(prompt, /Series markdown table/);
   assert.match(prompt, /Query section with that HogQL/);
   assert.match(prompt, /Open reports/);
@@ -207,7 +208,8 @@ test("phase 2 prompt gets candidates; shouldRunPhase2 is runner-agnostic", () =>
   assert.match(p2, /PHASE 2/);
   assert.match(p2, /sub-agents/);
   assert.match(p2, /session_replay_features/);
-  assert.match(p2, /session-recording-summaries-list/);
+  assert.match(p2, /vision-observations-list/);
+  assert.doesNotMatch(p2, /session-recording-summaries-list/);
   assert.match(p2, /"sessionId": "bbb"/);
   assert.equal(shouldRunPhase2(cfg, candidates, "# ok\n"), true);
   assert.equal(shouldRunPhase2({ ...cfg, runner: "cursor" }, candidates, "# ok\n"), true);
