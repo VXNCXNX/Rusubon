@@ -34,7 +34,7 @@ test("relative periods use complete UTC days and equal previous periods", () => 
     assert.equal(Date.parse(w.start) - Date.parse(w.baselineStart), days * 86_400_000);
     assert.equal(Date.parse(w.end) - Date.parse(w.historyStart), Math.max(30, days * 2) * 86_400_000);
   }
-  assert.equal(windowLabel(scoutWindow(opts, now)), "2026-08-29 to 2026-09-04 · UTC");
+  assert.equal(windowLabel(scoutWindow(opts, now)), "2026-08-29 to 2026-09-04, UTC");
   assert.equal(scoutWindow(opts, "2026-09-06T00:01Z").start, "2026-08-30T00:00:00.000Z");
 });
 

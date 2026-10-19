@@ -65,7 +65,7 @@ export function modelControls(state, selection, role = "scout") {
   const model = models.find(row => row.id === selection.model), available = model?.available && !connection?.checking;
   const roleLabel = role === "spec" ? "Spec creator" : role === "implementation" ? "Implementation" : "Scout";
   return `<label>Agent<select data-choice="runner" aria-label="${roleLabel} agent" id="${prefix}runner-select" ${busy ? "disabled" : ""}>${option("claude", "Claude Code", selection.runner === "claude")}${option("codex", "Codex", selection.runner === "codex")}</select></label>
-    <label>Model<select data-choice="model" aria-label="${roleLabel} model" id="${prefix}model-select" ${busy || !connection?.authenticated ? "disabled" : ""}>${models.map(row => option(row.id, row.label + (row.available ? "" : " · unavailable"), row.id === selection.model, !row.available)).join("")}</select></label>
+    <label>Model<select data-choice="model" aria-label="${roleLabel} model" id="${prefix}model-select" ${busy || !connection?.authenticated ? "disabled" : ""}>${models.map(row => option(row.id, row.label + (row.available ? "" : ", unavailable"), row.id === selection.model, !row.available)).join("")}</select></label>
     <label>Effort<select data-choice="effort" aria-label="${roleLabel} effort" id="${prefix}effort-select" ${busy || !available ? "disabled" : ""}>${(available ? model.efforts : [selection.effort]).map(effort => option(effort, effort, effort === selection.effort)).join("")}</select></label>`;
 }
 
