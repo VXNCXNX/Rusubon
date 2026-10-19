@@ -15,7 +15,8 @@ export function redact(text) {
   return String(text || "")
     .replace(/phx_[A-Za-z0-9]+/g, "phx_REDACTED")
     .replace(/phc_[A-Za-z0-9]+/g, "phc_REDACTED")
-    .replace(/Bearer\s+\S+/gi, "Bearer REDACTED");
+    // Token characters only (RFC 6750), so a quote or bracket after the token survives and JSON stays parseable.
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer REDACTED");
 }
 
 /** Run a preflight probe with a 15-second deadline and return status plus combined output. */
