@@ -53,7 +53,7 @@ ${template.trim()}
 `);
 }
 
-function readPull(runId, runDir) {
+function readPull(runId, runDir, removed = []) {
   const rel = `${runDir}/pull.json`;
   let data;
   try {
@@ -65,6 +65,8 @@ function readPull(runId, runDir) {
   if (!Array.isArray(data.written) || !Array.isArray(data.skipped)) throw new Error(`${rel} needs written[] and skipped[]`);
   for (const slug of data.written) {
     if (typeof slug !== "string" || !MIRROR.test(slug)) throw new Error(redact(`${rel} lists invalid slug ${JSON.stringify(slug)}`));
+    // A slug declined locally was just removed again; the runner ignoring the skip list is not a failed pull.
+    if (removed.includes(slug)) continue;
     const path = join(reportsDir(), `${slug}.md`);
     if (!existsSync(path)) throw new Error(`${rel} lists ${slug} but .rusubon/inbox/reports/${slug}.md is missing`);
     if (!/^posthog_report:\s*\S/m.test(readFileSync(path, "utf8"))) throw new Error(`.rusubon/inbox/reports/${slug}.md has no posthog_report: line`);
@@ -101,7 +103,7 @@ export async function pullInbox(config, probes, { run = runWith, runId, limit = 
   // Declined locally stays declined, even when the runner ignores the skip list or writes a bad pull.json.
   const removed = archivedSlugs.filter(slug => existsSync(join(reportsDir(), `${slug}.md`)));
   for (const slug of removed) unlinkSync(join(reportsDir(), `${slug}.md`));
-  const pulled = missingTools ? { written: [], skipped: [] } : readPull(runId, runDir);
+  const pulled = missingTools ? { written: [], skipped: [] } : readPull(runId, runDir, removed);
   onEvent({ type: "phase", name: "Inbox pull", status: "completed" });
   const summary = summarizeRun({ skillName: "pull", startedAt, before, closeOut });
   const out = { ...summary, runId, written: pulled.written.filter(slug => !removed.includes(slug)), skipped: pulled.skipped, removed, missingTools };
