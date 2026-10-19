@@ -248,12 +248,15 @@ $("load-current-setup").addEventListener("click", protect(async () => {
   renderState(); notice("Loaded current setup. Review it before saving.");
 }));
 $("context-form").addEventListener("submit", protect(async event => { event.preventDefault(); await start({ kind: "context", selection, about: event.target.elements.about.value }); }));
-const THEME_KEY = "rusubon:theme";
-function applyTheme(value) { if (value === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = value; }
-const savedTheme = storage.get(THEME_KEY);
-$("theme-select").value = ["light", "dark"].includes(savedTheme) ? savedTheme : "system";
+// A cookie, not localStorage: the dashboard picks a new port on each start and localStorage is scoped to the port.
+const readTheme = () => document.cookie.match(/(?:^|; )rusubon-theme=(light|dark)(?:;|$)/)?.[1] || "system";
+function applyTheme(value) {
+  if (value === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = value;
+  document.cookie = `rusubon-theme=${value}; Path=/; Max-Age=${value === "system" ? 0 : 31_536_000}; SameSite=Lax`;
+}
+$("theme-select").value = readTheme();
 applyTheme($("theme-select").value);
-$("theme-select").addEventListener("change", event => { storage.set(THEME_KEY, event.target.value); applyTheme(event.target.value); });
+$("theme-select").addEventListener("change", event => applyTheme(event.target.value));
 $("issue-form").addEventListener("submit", protect(async event => { event.preventDefault(); await start({ kind: "pr", selection: implementationSelection, specSelection, source: { kind: "issue", value: event.target.elements.issue.value.trim() } }); }));
 $("report-detail").addEventListener("submit", protect(async event => {
   if (event.target.id !== "decline-form") return; event.preventDefault();
