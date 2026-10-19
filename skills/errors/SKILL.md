@@ -34,7 +34,7 @@ Qualified session: hit a **context.md money path** in the analysis window, **and
 
 1. Read `.rusubon/memory/dedupe/errors-session-cursor.md` if it exists.
 2. Take at most **100** remaining ids, worst-first. Stop at **45 minutes**.
-3. Spawn **sub-agents in parallel**, ~10 ids each. Each sub-agent: HogQL events + console for those `session_id`s; `posthog.session_replay_features` on an `IN` list; replay metadata and stored summaries if present. Never generate summaries. Return notes: path, exception type/message, failed request, person, ids. **Sub-agents do not write inbox, candidates, cursor, or close-out.**
+3. Spawn **sub-agents in parallel**, ~10 ids each. Each sub-agent: HogQL events + console for those `session_id`s; `posthog.session_replay_features` on an `IN` list; replay metadata and existing replay observations (`vision-observations-list`) if present. Read only, never scan. Return notes: path, exception type/message, failed request, person, ids. **Sub-agents do not write inbox, candidates, cursor, or close-out.**
 4. You cluster. File 0–3 reports. P2 still needs ≥5 persons / ≥10 sessions. Copy `templates/report.md`. Paste the Series you already queried and the HogQL behind it.
 5. Upsert the cursor. Rewrite the close-out.
 

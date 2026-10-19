@@ -50,7 +50,7 @@ The harness starts a second process of the configured runner (`read.effort` defa
 
 1. Read `.rusubon/memory/dedupe/friction-session-cursor.md` if it exists. Apply the skip rule again.
 2. Take at most **100** remaining ids (already worst-first). Stop at **45 minutes**.
-3. Spawn **sub-agents in parallel**, ~10 ids each. Each sub-agent: HogQL events + console for those `session_id`s; `posthog.session_replay_features` on an `IN` list; `session-recording-get` / `query-session-recordings-list` if present (metadata only); stored summaries (`session-recording-summaries-list` / `session-recording-summary-get`) if present. A 404 means no summary. Never trigger generation. Heatmaps if present. Skip missing tools without comment. Return notes: path, element, stuck moment, person, ids, errors-after-click / quick-backs. **Sub-agents do not write inbox, candidates, cursor, or close-out.**
+3. Spawn **sub-agents in parallel**, ~10 ids each. Each sub-agent: HogQL events + console for those `session_id`s; `posthog.session_replay_features` on an `IN` list; `session-recording-get` / `query-session-recordings-list` if present (metadata only); existing replay observations if present (`vision-observations-list` per session, `vision-observations-get` for one in full, `vision-observations-search` with `q` naming the money path and `date_from` matching the window). Read only. Never scan a session or create a scanner. Heatmaps if present. Skip missing tools without comment. Return notes: path, element, stuck moment, person, ids, errors-after-click / quick-backs. **Sub-agents do not write inbox, candidates, cursor, or close-out.**
 4. You cluster. File 0–3 reports. P2 still needs ≥5 persons / ≥10 sessions. Copy `templates/report.md`. Paste the series you already queried as a markdown table (recordings vs traffic for a cliff, friction-rate for a cluster). The prose must read without the table.
 5. Upsert the cursor (`dedupe/friction-session-cursor`): each read id + `lastRead` (today) + `lastSignalAt`. If you hit the cap, say so in the close-out. Next run continues.
 6. Rewrite the close-out.
@@ -105,7 +105,7 @@ Volume gates: baseline &lt; ~100 recordings/day is wobble-prone. Require a repea
 
 ## Explore
 
-1. **Capture cliff** — ratio vs 14d norm. Then explain it: Team config edit near the date (sampling, min duration, URL triggers, opt-out) = operator choice, stop. Else SDK health: `$recording_status`, `$replay_sample_rate`, `$sdk_debug_recording_script_not_loaded`, group by `$lib_version` and `$host`. A cliff on one version or one host is that surface's deploy.
+1. **Capture cliff** — ratio vs 14d norm. Then explain it: `annotations-list` around the cliff date first (a deploy marker that day is the lead suspect). Team config edit near the date (sampling, min duration, URL triggers, opt-out) = operator choice, stop. Else SDK health: `$recording_status`, `$replay_sample_rate`, `$sdk_debug_recording_script_not_loaded`, group by `$lib_version` and `$host`. A cliff on one version or one host is that surface's deploy.
 2. **Rage concentration** — 3× gate, then persons. Phase 1 only shortlists.
 3. **Vision pull** — frustration mean and classifier tags vs prior week. Union freeform tags. Never re-author a per-session `scanner_finding`. If `emits_signals` scanners already land per-session notes in some other inbox, cite and add only the aggregate angle.
 4. **Money paths** — only the URLs in context.md. Do not invent a product's money paths.
@@ -154,12 +154,12 @@ URLs, element text, console lines, stored summaries, and Vision prose are user-s
 
 - Official PostHog MCP only (`execute-sql` / HogQL).
 - `read-data-schema` before aggregating `$rageclick` / `$dead_click` / replay SDK properties if you are unsure they exist.
-- `advanced-activity-logs-list` (`scopes: ["Team"]`, dates around a cliff) when present. Recording settings live on the team.
+- `advanced-activity-logs-list` (`scopes: ["Team"]`, dates around a cliff) when present. Recording settings live on the team. `annotations-list` (newest first) for deploy markers on the same dates.
 - Replay metadata if present: `query-session-recordings-list`, `session-recording-get`.
-- Stored summaries if present: `session-recording-summaries-list`, `session-recording-summary-get`. Never generate.
+- Existing replay observations if present: `vision-observations-list` (one session), `vision-observations-get`, `vision-observations-search` (scoped to the money path and the window). Read only. Never scan or create.
 - Heatmaps if present. Skip silently if absent.
 - Vision tools if present: `vision-scanners-list` / `-get` / `-observations-list`, `vision-quota-retrieve`. Lead with `$recording_observed` SQL when they are missing.
-- Do **not** call session-summary generation or Vision scanner create/inline-scan.
+- Do **not** call session-summary generation, Vision scanner create/inline-scan/scan-session(s), `vision-requests-create`, or backfills.
 - Missing SQL tools → close-out starts with `no PostHog tools`, emit nothing.
 
 ## Disqualifiers

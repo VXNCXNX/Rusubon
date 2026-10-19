@@ -120,7 +120,7 @@ In Runs, choose the PostHog project in Setup, then set the investigation:
 Click checks query `$rageclick` and `$dead_click` events. Error checks use
 `$exception` events and recorded failure counters. Coverage compares pageviews
 with recording metadata. Existing replay analysis reads `$recording_observed`
-signals and available stored summaries; it never creates scanners or summaries.
+signals and Vision observations; it never creates scanners or scans sessions.
 All checks use traffic for context. Missing optional evidence is recorded as a
 limitation. Coverage and replay checks may read at least 30 days of diagnostic
 history, shown before launch. Findings and session candidates stay within the
@@ -284,6 +284,10 @@ Log into the runner (`claude` by default). Point it at the official PostHog MCP:
 ```bash
 npx @posthog/wizard mcp add
 ```
+
+On Claude Code, the PostHog AI plugin also works: `claude plugin install posthog`, then `/mcp` inside Claude to authorize.
+
+A setup that only scouts may use `https://mcp.posthog.com/mcp?readonly=true`, which strips every writing tool. The inbox bridge (claim, PR link, feedback) needs the default URL.
 
 The PostHog key lives in the runner's config, never in the repo.
 
