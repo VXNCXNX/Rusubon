@@ -6,6 +6,7 @@ import { draftContext } from "./context-draft.mjs";
 import { decline } from "./decline.mjs";
 import { collectChecks, formatDoctor } from "./doctor.mjs";
 import { listInbox, parseReport, printInbox, printShow, showReport } from "./inbox.mjs";
+import { pullInbox } from "./inbox-pull.mjs";
 import { remember } from "./memory.mjs";
 import { runBridgeStep } from "./pr-bridge.mjs";
 import { runPr } from "./pr.mjs";
@@ -36,6 +37,7 @@ Usage:
                                        research, auto-spec, verify; draft PR
                                        a ph-<id> report is claimed in PostHog, the draft PR linked, then released
   rusubon inbox                        list open reports
+  rusubon inbox pull [--limit 20]      mirror PostHog self-driving reports (ready, pending_input) as ph-<id> files
   rusubon show <slug>                  print a report (open or archived)
   rusubon decline <slug> --why "…"     archive a report + write memory/noise
                                        a ph-<id> report also sends the why to PostHog as negative feedback
@@ -157,8 +159,16 @@ export async function main(argv) {
         console.log(`sent as negative feedback to PostHog report ${posthogReport}`);
       });
     }
-    case "inbox":
+    case "inbox": {
+      if (!rest.length) return printInbox(listInbox());
+      if (rest[0] !== "pull") throw new Error("usage: rusubon inbox [pull [--limit 20]]");
+      const limit = takeOption(rest.slice(1), "limit");
+      if (limit.rest.length || (limit.value !== undefined && !/^\d+$/.test(limit.value))) throw new Error("usage: rusubon inbox pull [--limit 20]");
+      const config = loadConfig();
+      await withRepoLock(process.cwd(), () => pullInbox(config, undefined, { limit: limit.value === undefined ? 20 : Number(limit.value) }));
+      console.log("");
       return printInbox(listInbox());
+    }
     case "show": {
       const slug = rest[0];
       if (!slug) throw new Error("usage: rusubon show <slug>");

@@ -9,7 +9,6 @@ import { archiveDir, cwd, reportsDir, runsDir } from "./paths.mjs";
 import { runWith } from "./runners.mjs";
 import { snapshotState, summarizeRun } from "./summary.mjs";
 
-const STATUSES = ["potential", "candidate", "in_progress", "pending_input", "ready", "resolved", "failed", "suppressed"];
 const MIRROR = /^ph-[a-z0-9-]+$/;
 
 function archivedMirrors() {
@@ -76,8 +75,6 @@ function readPull(runId, runDir) {
 export async function pullInbox(config, probes, { run = runWith, runId, limit = 20, statuses = ["ready", "pending_input"], onEvent = () => {} } = {}) {
   assertReady(config, probes);
   if (!Number.isInteger(limit) || limit < 1) throw new Error(`limit must be a positive integer (got ${limit})`);
-  const unknown = statuses.filter(status => !STATUSES.includes(status));
-  if (!statuses.length || unknown.length) throw new Error(`unknown PostHog inbox status '${unknown.join(", ")}'. use ${STATUSES.join(" | ")}`);
   runId ||= `pull-${randomUUID()}`;
   if (!/^[a-zA-Z0-9-]+$/.test(runId)) throw new Error("Invalid run id");
   mkdirSync(resolve(runsDir(), runId), { recursive: true });
