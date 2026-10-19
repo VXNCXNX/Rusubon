@@ -48,7 +48,7 @@ build, separate web server, or hosted Rusubon account to set up.
 1. Open **Setup**. Sign in to Claude Code or Codex if needed, then choose **Connect PostHog** for that runner and complete authorization in your browser.
 2. Enter your PostHog project ID and US or EU region. Add product context, including actual URLs or paths under `# Money paths`, intentional friction, and exclusions. Confirm the context and click **Save setup**. This initializes Rusubon's files in your product repository.
 3. Open **Runs**. Choose the period, money paths, checks, and any additional context. Select your agent, model, and effort, then click **Launch scout**.
-4. Follow progress and answer agent questions on the run page. Open **Findings** to review the evidence. **Research** holds the separate spec creator and implementation settings for a human-launched draft PR.
+4. Follow progress and answer agent questions on the run page. Open **Inbox** to review the evidence, or pull the reports PostHog has ready. **Research** holds the separate spec creator and implementation settings for a human-launched draft PR.
 
 Next time, open a terminal in that product repository and run:
 
@@ -204,7 +204,7 @@ A durable guard blocks scouting during context drafting and after a dashboard
 crash. The supervisor waits for the draft's processes to stop, restores the
 review placeholder, then clears the guard. Recovered drafts require human review.
 
-Findings displays the report's evidence and HogQL. Decline archives a finding
+Inbox displays the report's evidence and HogQL. Decline archives a finding
 and saves your reason to memory. Research & create draft PR explicitly launches
 the existing research, spec, implementation, verification, and publishing flow.
 It creates a worktree under `~/.rusubon/worktrees/` from the current committed
