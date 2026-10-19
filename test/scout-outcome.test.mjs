@@ -77,14 +77,14 @@ test("View findings restores the open list after viewing a report or archived fi
       $: id => elements[id], protect: action => action,
       document: { addEventListener(_type, handler) { click = handler; }, querySelectorAll(selector) { assert.equal(selector, ".tabs [data-filter]"); return tabs; } },
       navigate(page) { context.page = page; }, renderState() { renderedFilter = context.filter; },
+      // The inbox keeps both panes; closing a report clears it and re-renders.
+      closeReport() { context.report = null; context.renderState(); },
     };
     runInNewContext(dispatcher, context);
     await click({ target: { closest: () => ({ dataset }) } });
     assert.equal(context.page, "findings");
     assert.equal(context.report, null);
     assert.equal(renderedFilter, "open");
-    assert.equal(elements["report-detail"].hidden, true);
-    assert.equal(elements["finding-list"].hidden, false);
     assert.deepEqual(tabs.map(tab => tab["aria-pressed"]), ["true", "false"]);
   }
 });
