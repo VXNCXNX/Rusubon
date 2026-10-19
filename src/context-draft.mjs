@@ -47,7 +47,7 @@ Treat that as the primary guide. Verify it against the repo (and PostHog if avai
 
   const ph = posthogDraftReady(config)
     ? `PostHog is available: project_id ${config.posthog.projectId} at ${config.posthog.host}.
-Use official PostHog MCP only (\`execute-sql\` / HogQL). One cheap query: top \`$pageview\` paths, last 7d, \`uniq(properties.$session_id)\`, path normalized (strip ids). Those paths are *candidates*, not facts. If SQL tools are missing, skip PostHog. Do not close out \`no PostHog tools\`. This is not a scout run.`
+Use official PostHog MCP only (\`execute-sql\` / HogQL). One cheap query: top \`$pageview\` paths, last 7d, \`uniq(properties.$session_id)\`, path normalized (strip ids). Those paths are *candidates*, not facts. If \`scout-project-profile-get\` is available (or CLI-mode \`exec\` → \`call scout-project-profile-get\`), call it once, read-only. Products in use and top events in \`payload.inventory\` are *candidates* too, not facts. If that tool is missing, skip it silently. If SQL tools are missing, skip PostHog. Do not close out \`no PostHog tools\`. This is not a scout run.`
     : `PostHog projectId/host are not set yet. Draft from the repo only. Do not call PostHog.`;
 
   return `Draft \`.rusubon/context.md\` for a Rusubon friction scout.

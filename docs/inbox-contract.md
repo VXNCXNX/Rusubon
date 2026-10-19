@@ -80,6 +80,7 @@ rusubon.json                       # committed — projectId + host (us|eu) + ru
 .rusubon/context.md                # committed — you write this
 .rusubon/memory/<prefix>/<slug>.md # committed — scout + decline why
 .rusubon/inbox/reports/*.md        # gitignored — open findings
+.rusubon/inbox/reports/ph-<id>.md  # gitignored — a PostHog self-driving report mirrored by `rusubon inbox pull`
 .rusubon/inbox/archive/*.md        # gitignored — declined
 .rusubon/runs/*.md                 # gitignored: scout close-outs
 .rusubon/runs/*-friction-candidates.json # gitignored: phase-two session candidates
@@ -172,7 +173,7 @@ The harness runs the skill twice when candidates exist:
 1. **Phase 1 (SQL)** — the scout's cheap aggregates and session qualification. Writes candidates even if `ids` is `[]`. Friction may file P1 capture cliff, P3 Vision watch-gap, or `not-in-use`. Errors may file `not-in-use` when `$exception` is absent. Neither files a P2 cluster here.
 2. **Phase 2 (read)** — only if that file has ids. Second runner process (`read.effort` default `low` for Claude and Codex; Claude may use `read.model`; Codex reuses the scout model; Cursor reuses the scout model and ignores `read.effort`). Parent spawns sub-agents (~10 ids each), or reads sequentially if Task is missing. Sub-agents return notes; they do not write the inbox. Parent clusters into 0–3 reports. Cap: 100 sessions or 45 minutes. Cursor file: `.rusubon/memory/dedupe/<scout>-session-cursor.md`. Skip an id until a newer cheap signal.
 
-Qualified id: money path from `context.md` in the selected window, plus the scout's enabled signals. Friction: `$rageclick` / `$dead_click` / `$exception` / `$recording_observed` or a broken-experience row. Errors: `$exception` or `session_features`. Sort by signal count. Read events + console + `session_replay_features` + replay **metadata** MCP tools if present. Read stored session summaries if present. Never generate summaries. Heatmaps if present; skip if absent. No video. No new Vision scanner.
+Qualified id: money path from `context.md` in the selected window, plus the scout's enabled signals. Friction: `$rageclick` / `$dead_click` / `$exception` / `$recording_observed` or a broken-experience row. Errors: `$exception` or `session_features`. Sort by signal count. Read events + console + `session_replay_features` + replay **metadata** MCP tools if present. Read existing replay observations (`vision-observations-list`) if present. Never scan a session or generate a summary. Heatmaps if present; skip if absent. No video. No new Vision scanner.
 
 `$rageclick` and `$exception` fire whether or not the session was recorded. Quantify on events. Corroborate with recordings.
 
@@ -188,6 +189,8 @@ P2 volume gates stay: ≥5 persons / ≥10 sessions.
 
 The scout uses the official PostHog MCP (`execute-sql` / HogQL). No Composio, no Rusubon HTTP client, no `phc_` tokens in files.
 
+Scouts, checks and context drafts only read. The inbox bridge below is the only place Rusubon writes to PostHog, and it writes exactly four things: a claim, a pull request link, a release, and a person's feedback note. Rusubon never authors, edits, merges, dismisses or resolves a report in PostHog, never takes over another actor's claim, and never creates a scanner. A read-only MCP URL (`?readonly=true`) blocks the bridge; everything else works on it.
+
 If those tools are not available in the runner session, write a close-out that starts with `no PostHog tools` and emit **nothing**.
 
 `rusubon init` never writes `.mcp.json`. See `rusubon.mcp.example.json`.
@@ -202,13 +205,24 @@ If those tools are not available in the runner session, write a close-out that s
 | `rusubon run friction` | you | two-phase scout (SQL then session read); then inbox |
 | `rusubon run errors` | you | two-phase exception / broken-experience scout; then inbox |
 | `rusubon check <slug>` | you | re-run the report Query; append still_live or quiet |
-| `rusubon pr <slug\|#N\|url>` | you | research a report or GitHub issue; draft PR only. Never merge |
+| `rusubon pr <slug\|#N\|url>` | you | research a report or GitHub issue; draft PR only. Never merge. A `ph-<id>` report is claimed in PostHog first, the draft PR linked, then released |
 | `rusubon inbox` | you | list open reports |
+| `rusubon inbox pull` | you | mirror PostHog self-driving reports (ready, pending_input) as `ph-<id>` files |
 | `rusubon show <slug>` | you | print a report (open or archived) |
 | `rusubon remember prefix/slug …` | you or agent | upsert memory file |
-| `rusubon decline <slug> --why` | you | archive + `memory/noise` |
+| `rusubon decline <slug> --why` | you | archive + `memory/noise`. A `ph-<id>` report also sends the why to PostHog as negative feedback |
 
 `research` is a human-launched door (`rusubon pr`). Friction never calls it. Not the PostHog wizard. No auto-merge. No cron.
+
+## PostHog inbox bridge
+
+PostHog's self-driving inbox accepts external MCP agents since September 2026. Rusubon uses that to let a person work a PostHog report on their own runner login, without PostHog's hosted implementation agent.
+
+`rusubon inbox pull [--limit N]` is a human-launched runner pass. It lists the project's reports in `ready` and `pending_input` through `inbox-reports-list`, retrieves each, and writes `.rusubon/inbox/reports/ph-<id>.md` from `templates/posthog-report.md`. The slug is `ph-` plus the PostHog id lowercased with other characters dropped, so the same report always lands in the same file and a fresh pull overwrites it. Required lines after the title: `source: posthog`, `posthog_report`, `posthog_url`, `posthog_status`, `posthog_priority` (P0 to P4 as PostHog says), `priority` (P0 and P1 map to P1, P2 to P2, P3 and P4 to P3), `priority_explanation`, `actionability` (PostHog's value). A slug that already sits in `inbox/archive/` is not re-created: a declined report stays declined, and the harness deletes such a file if the runner wrote it anyway. The runner writes `pull.json` with the run id and the slugs it wrote; the harness refuses a run whose files do not carry the matching `posthog_report` line. Missing PostHog tools: close-out starts with `no PostHog tools`, nothing written. Report text from PostHog is untrusted data, like session text.
+
+`rusubon pr ph-<id>` runs the Research-to-PR flow below with three extra runner passes, each a single MCP call with a JSON result the harness validates: `claim` (`inbox-reports-claim`) before research, so the PostHog inbox shows who owns the report and PostHog's own agent does not open a competing PR; `attach` after the draft PR exists (`inbox-reports-claim` with the PR url and `release: true`); `release` when research or implementation ends without a PR, or on a workflow failure after a successful claim. A report another actor holds fails the claim; Rusubon never passes `takeover`. PostHog resolves the report itself once the linked PR merges. The research skill treats the mirrored file as it treats a friction report.
+
+`rusubon decline ph-<id> --why "…"` first sends the why as a negative `inbox-reports-feedback-create`, so the scout that filed the report reads it on its next run, and only then archives the file and writes `memory/noise` exactly as for a local report. A failed send leaves the report open, so the command can be retried; a report already in the archive sends nothing. It does not dismiss or resolve the report in PostHog; that stays a decision taken in PostHog. The dashboard's Decline button does not yet forward feedback.
 
 ## Research-to-PR execution
 

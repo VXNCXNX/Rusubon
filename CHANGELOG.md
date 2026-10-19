@@ -24,6 +24,19 @@ has been published yet.
   finding or launch research, spec creation, implementation, and a verified draft
   PR in a separate worktree. No automatic merge or deployment.
 - CLI scouting (`friction`, `errors`), `rusubon tick` patrol, `rusubon schedule` host install, evidence checks, context drafting, inbox review, and memory, alongside the dashboard.
+- PostHog inbox bridge. `rusubon inbox pull` mirrors the project's self-driving
+  reports as `ph-<id>` files. `rusubon pr ph-<id>` claims the report in PostHog,
+  links the draft PR and releases the claim. `rusubon decline ph-<id>` forwards
+  the reason as negative feedback to the scout that filed it. Rusubon never
+  authors, edits, dismisses or resolves a report in PostHog.
+- Scouts read existing Replay Vision observations (`vision-observations-list`,
+  `-get`, `-search`) instead of the retired session summary tools, and check
+  `annotations-list` for a deploy on the day of a capture cliff. Context drafts
+  may read `scout-project-profile-get`.
+- Documented the PostHog AI plugin as a second MCP install path and the
+  read-only MCP URL for scout-only setups.
+- Dependencies: Claude Agent SDK 0.3.303, marked 18.1.1, sanitize-html 2.18.1.
+  GitHub Actions runs the test suite on pull requests.
 
 ### Preview limits
 
@@ -36,6 +49,9 @@ has been published yet.
 - `errors` scout and `rusubon check <slug>` for re-running a report's HogQL.
 - Model availability depends on the installed runner and account. Optional
   recording and replay evidence may be unavailable for a project.
+- The inbox bridge needs the default MCP URL; a `?readonly=true` connection
+  blocks claims, PR links and feedback. The dashboard's Decline button does not
+  forward feedback to PostHog yet.
 - Automated tests and browser QA cover the dashboard and scope handoff. A fresh
   package install, dashboard startup, and first Setup save have passed a smoke
   check. The new scope flow has not yet been verified with a live PostHog scout.

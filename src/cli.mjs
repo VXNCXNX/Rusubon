@@ -1,10 +1,13 @@
+import { randomUUID } from "node:crypto";
 import { takeFlag, takeOption, readStdin } from "./argv.mjs";
 import { initConfig, loadConfig, CONFIG_NAME } from "./config.mjs";
 import { draftContext } from "./context-draft.mjs";
 import { decline } from "./decline.mjs";
 import { collectChecks, formatDoctor } from "./doctor.mjs";
-import { listInbox, printInbox, printShow, showReport } from "./inbox.mjs";
+import { listInbox, posthogRef, printInbox, printShow, showReport } from "./inbox.mjs";
+import { pullInbox } from "./inbox-pull.mjs";
 import { remember } from "./memory.mjs";
+import { runBridgeStep } from "./pr-bridge.mjs";
 import { runPr } from "./pr.mjs";
 import { checkReport } from "./check.mjs";
 import { listSkills, runSkill } from "./run.mjs";
@@ -31,9 +34,12 @@ Usage:
   rusubon check <slug>                 re-run a report's HogQL; append still_live or quiet
   rusubon pr <slug|#N|url> [--issue|--report]
                                        research, auto-spec, verify; draft PR
+                                       a ph-<id> report is claimed in PostHog, the draft PR linked, then released
   rusubon inbox                        list open reports
+  rusubon inbox pull [--limit 20]      mirror PostHog self-driving reports (ready, pending_input) as ph-<id> files
   rusubon show <slug>                  print a report (open or archived)
   rusubon decline <slug> --why "…"     archive a report + write memory/noise
+                                       a ph-<id> report also sends the why to PostHog as negative feedback
   rusubon remember <prefix/slug> […]   upsert .rusubon/memory/<prefix>/<slug>.md
   rusubon skills                       list bundled skills
   rusubon runners                      show runner status
@@ -142,13 +148,29 @@ export async function main(argv) {
       if (!slug || !parsed.value) {
         throw new Error('usage: rusubon decline <slug> --why "…"');
       }
-      return withRepoLock(process.cwd(), () => {
+      return withRepoLock(process.cwd(), async () => {
+        // Feedback goes first: a failed send leaves the report open so the command can be retried.
+        const report = showReport(slug);
+        const posthog = report.where === "reports" ? posthogRef(report.slug, report.body) : null;
+        if (posthog) {
+          const runId = `decline-${randomUUID()}`;
+          await runBridgeStep({ step: "feedback", config: loadConfig(), reportId: posthog.id, reportUrl: posthog.url, runId, runDir: `.rusubon/runs/${runId}`, note: parsed.value });
+          console.log(`sent as negative feedback to PostHog report ${posthog.id}`);
+        }
         const result = decline(slug, parsed.value);
         console.log(`archived ${result.slug}; wrote .rusubon/memory/noise/${result.slug}.md`);
       });
     }
-    case "inbox":
+    case "inbox": {
+      if (!rest.length) return printInbox(listInbox());
+      if (rest[0] !== "pull") throw new Error("usage: rusubon inbox [pull [--limit 20]]");
+      const limit = takeOption(rest.slice(1), "limit");
+      if (limit.rest.length || (limit.value !== undefined && !/^\d+$/.test(limit.value))) throw new Error("usage: rusubon inbox pull [--limit 20]");
+      const config = loadConfig();
+      await withRepoLock(process.cwd(), () => pullInbox(config, undefined, { limit: limit.value === undefined ? 20 : Number(limit.value) }));
+      console.log("");
       return printInbox(listInbox());
+    }
     case "show": {
       const slug = rest[0];
       if (!slug) throw new Error("usage: rusubon show <slug>");

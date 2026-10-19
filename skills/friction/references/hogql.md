@@ -313,7 +313,7 @@ ORDER BY timestamp
 LIMIT 200
 ```
 
-Replay metadata if present: `session-recording-get`, `query-session-recordings-list`. Stored AI summaries if present: `session-recording-summaries-list` / `session-recording-summary-get` (`session_ids`, `has_exceptions`, `outcome`). A 404 means no summary. Never trigger generation. `outcome=failure` alone is mostly benign bounces. Require the exception flag or corroborating friction.
+Replay metadata if present: `session-recording-get`, `query-session-recordings-list`. Existing replay observations if present: `vision-observations-list` (`session_id`), `vision-observations-get` (one in full), `vision-observations-search` (`q`, `date_from`, `scanner_id`). Read only. Never scan a session or create a scanner. A failure verdict or a summary line alone is mostly benign bounces. Require the exception flag or corroborating friction.
 
 Heatmaps (`heatmaps-list` / `heatmaps-events`) confirm a spatial cluster. Skip without comment if absent.
 
