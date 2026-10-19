@@ -56,19 +56,19 @@
         <header class="bar"><h1 id="research-title">Research</h1><div class="bar-end"><span class="caption" id="pr-readiness"></span></div></header>
         <div class="column">
           <div class="agent-roles">
-            <fieldset class="role-fieldset"><legend>Spec creator</legend><p class="caption" id="spec-help"></p><div id="spec-model-controls" class="model-controls"></div></fieldset>
-            <fieldset class="role-fieldset"><legend>Implementation</legend><div id="implementation-model-controls" class="model-controls"></div></fieldset>
+            <fieldset class="role-fieldset"><legend>Spec creator</legend><p class="caption role-note">Researches the finding or issue and writes the spec.</p><div id="spec-model-controls" class="model-controls"></div><p class="caption role-help" id="spec-help"></p></fieldset>
+            <fieldset class="role-fieldset"><legend>Implementation</legend><p class="caption role-note">Builds from the validated spec and opens the draft PR.</p><div id="implementation-model-controls" class="model-controls"></div></fieldset>
           </div>
-          <p class="caption"><button type="button" class="link" data-page="setup">Save these as defaults in Setup</button></p>
-          <div class="section"><h2>Start from evidence</h2><p>Open a finding in the inbox and choose Research &amp; draft PR.</p><button class="btn" type="button" data-page="inbox">Open the inbox</button></div>
-          <div class="section"><h2>Start from a GitHub issue</h2><form id="issue-form" class="inline-form"><label class="grow">Issue number or URL<input name="issue" placeholder="#42" required autocomplete="off"></label><button class="btn primary" id="launch-issue" type="submit">Research &amp; draft PR</button></form></div>
+          <p class="caption roles-save"><button type="button" class="link" data-page="setup">Save these as defaults in Setup</button></p>
+          <div class="section start"><h2>Start from evidence</h2><p>Open a finding in the inbox and choose Research &amp; draft PR.</p><button class="btn" type="button" data-page="inbox">Open the inbox</button></div>
+          <div class="section start"><h2>Start from a GitHub issue</h2><form id="issue-form" class="inline-form"><label class="grow">Issue number or URL<input name="issue" placeholder="#42" required autocomplete="off"></label><button class="btn primary" id="launch-issue" type="submit">Research &amp; draft PR</button></form></div>
         </div>
       </section>
 
       <section id="page-setup" hidden aria-labelledby="setup-title">
         <header class="bar"><h1 id="setup-title">Setup</h1><div class="bar-end"><code id="repo-path" class="repo-path"></code></div></header>
         <div class="column">
-          <div class="section"><div class="section-head"><h2>Agent connections</h2><button class="link" id="refresh-connections" type="button">Check again</button></div><div id="connections" class="connections"></div></div>
+          <div class="section"><div class="section-head"><h2>Agent connections</h2><button class="link" id="refresh-connections" type="button">Check both</button></div><div id="connections" class="connections"></div></div>
           <form id="setup-form" class="setup-form">
             <div id="setup-conflict" class="notice" role="status" hidden><p>Setup changed on disk. Your edits are kept. Review the current files before saving.</p><div class="actions"><button type="button" class="link" id="view-current-setup">View current setup</button><button type="button" class="link" id="load-current-setup">Replace form with current setup</button></div></div>
             <div class="section permission-settings">
@@ -87,7 +87,7 @@
             </div>
             <div class="save-row"><span class="caption" id="saved-selection"></span><button class="btn primary" type="submit" id="save-setup">Save setup</button></div>
           </form>
-          <div class="section draft-context"><h2>Let your agent propose the context</h2><form id="context-form"><label>What does this product do?<textarea name="about" rows="3" placeholder="Who uses it, and what should they be able to do?"></textarea></label><button id="draft-context" type="submit" class="btn">Draft product context</button></form></div>
+          <div class="section draft-context"><h2>Let your agent propose the context</h2><p class="caption">Your scout agent reads this repository and drafts the product context above for you to review. Available until the context is confirmed.</p><form id="context-form"><label>What does this product do?<textarea name="about" rows="3" placeholder="Who uses it, and what should they be able to do?"></textarea></label><button id="draft-context" type="submit" class="btn">Draft product context</button></form></div>
         </div>
       </section>
 
