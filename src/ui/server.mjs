@@ -21,6 +21,8 @@ ASSETS.set("/scout-scope.mjs", ["../../scout-scope.mjs", "text/javascript"]);
 ASSETS.set("/scope-controls.js", ["scope-controls.js", "text/javascript"]);
 ASSETS.set("/usage.js", ["usage.js", "text/javascript"]);
 ASSETS.set("/usage.css", ["usage.css", "text/css"]);
+ASSETS.set("/runs.css", ["runs.css", "text/css"]);
+ASSETS.set("/setup.css", ["setup.css", "text/css"]);
 const json = (res, data, code = 200) => { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(data)); };
 async function body(req) {
   if (!/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) throw new Error("Expected application/json");
@@ -90,11 +92,11 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
       }
       if (path === "/api/connections/refresh") { refreshConnection(input.runner); return json(res, { checking: true }, 202); }
       if (path === "/api/jobs") {
-        if (!["init", "setup", "login", "connect_mcp", "context", "scout", "pr", "decline"].includes(input.kind)) throw new Error("Unsupported operation");
+        if (!["init", "setup", "login", "connect_mcp", "context", "scout", "pr", "decline", "inbox_pull"].includes(input.kind)) throw new Error("Unsupported operation");
         const operation = { kind: input.kind };
         if (["login", "connect_mcp"].includes(input.kind)) { if (!Object.hasOwn(MODEL_ALLOWLIST, input.runner)) throw new Error("Unsupported runner"); operation.runner = input.runner; }
-        if (["context", "scout", "pr"].includes(input.kind)) {
-          operation.selection = validateSavedSelection(input.kind === "context" ? { ...input.selection, effort: "low" } : input.selection);
+        if (["context", "scout", "pr", "inbox_pull"].includes(input.kind)) {
+          operation.selection = validateSavedSelection(["context", "inbox_pull"].includes(input.kind) ? { ...input.selection, effort: "low" } : input.selection);
           operation.permissionMode = workspaceState(repo).config.permissionMode;
         }
         if (input.kind === "pr") operation.specSelection = validateSavedSelection(input.specSelection || workspaceState(repo).config.spec, "spec");
@@ -106,6 +108,7 @@ export async function startDashboard({ repo = process.cwd(), port = 0, open = tr
         }
         if (["pr", "decline"].includes(input.kind)) operation.source = source(input.source);
         if (input.kind === "decline") { if (operation.source.kind !== "report" || typeof input.reason !== "string" || !input.reason.trim() || input.reason.length > 10_000) throw new Error("A decline reason is required"); operation.reason = input.reason.trim(); }
+        if (input.kind === "inbox_pull") { if (input.limit !== undefined && (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 50)) throw new Error("Pull between 1 and 50 reports"); operation.limit = input.limit ?? 20; }
         if (input.kind === "context") { if (typeof input.about !== "string" || input.about.length > 20_000) throw new Error("Describe the product in 20,000 characters or fewer"); operation.about = input.about; }
         if (input.kind === "setup") { if (!input.setup || typeof input.setup !== "object") throw new Error("Setup is required"); assertSetupRevision(repo, input.setup.expectedRevision); operation.setup = input.setup; }
         return json(res, jobs.start(operation), 202);

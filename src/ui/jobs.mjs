@@ -59,7 +59,7 @@ export class Jobs extends EventEmitter {
   }
   start(input) {
     if (process.platform === "win32") throw new Error("Use WSL for supervised agent runs on Windows");
-    if (["scout", "context", "pr"].includes(input.kind)) input = { ...input, permissionMode: resolvePermissionMode(input.permissionMode) };
+    if (["scout", "context", "pr", "inbox_pull"].includes(input.kind)) input = { ...input, permissionMode: resolvePermissionMode(input.permissionMode) };
     const release = acquireRepoLock(this.repo);
     try { this.recoverContext(); } catch (error) { release(); throw error; }
     const id = `ui-${randomUUID()}`;
