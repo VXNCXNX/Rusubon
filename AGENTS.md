@@ -17,4 +17,5 @@ Local scout harness. Inbox is files in the product repo. PostHog is the warehous
 - This is not a PostHog product. Say "works with PostHog", never "PostHog Rusubon".
 - `rusubon pr <slug|#N|url>` is a human-launched research pass. Draft via `gh pr create --draft`. Never merge. No cron. Not the PostHog wizard. Read `writing-pr-descriptions` before `gh pr create`. Friction never calls this.
 - For the auto-spec phases, verification receipts and publishing ownership in `rusubon pr`, read `docs/inbox-contract.md` under Research-to-PR execution.
+- PostHog inbox bridge: `rusubon inbox pull` mirrors PostHog self-driving reports as `ph-<id>` files. `rusubon pr ph-<id>` claims the report in PostHog, links the draft PR, then releases. `rusubon decline ph-<id>` sends the why as negative feedback. Those four writes (claim, PR link, release, feedback) are the only PostHog writes. Rusubon never authors, edits, dismisses or resolves a PostHog report, and never passes `takeover`.
 - Contract: `docs/inbox-contract.md`.
