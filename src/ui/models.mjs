@@ -2,13 +2,13 @@ const COMMON = ["low", "medium", "high", "xhigh", "max"];
 export const canonicalClaudeModel = value => String(value || "").replace(/\[1m\]$/, "");
 export const MODEL_ALLOWLIST = {
   claude: [
-    { id: "claude-sonnet-5", label: "Sonnet 5", defaultEffort: "high", efforts: COMMON },
-    { id: "claude-opus-5", label: "Opus 5", defaultEffort: "high", efforts: COMMON },
+    { id: "claude-haiku-5-5", label: "Haiku 5.5", defaultEffort: "high", efforts: COMMON },
+    { id: "claude-sonnet-5-5", label: "Sonnet 5.5", defaultEffort: "high", efforts: COMMON },
+    { id: "claude-opus-5-5", label: "Opus 5.5", defaultEffort: "high", efforts: COMMON },
   ],
   codex: [
-    { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", defaultEffort: "medium", efforts: COMMON },
-    { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", defaultEffort: "medium", efforts: [...COMMON, "ultra"] },
-    { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", defaultEffort: "low", efforts: [...COMMON, "ultra"] },
+    { id: "gpt-6-luna", label: "GPT-6 Luna", defaultEffort: "medium", efforts: COMMON },
+    { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", defaultEffort: "low", efforts: [...COMMON, "ultra"] },
     { id: "gpt-6-astra", label: "GPT-6 Astra", defaultEffort: "low", efforts: [...COMMON, "ultra"] },
   ],
 };
@@ -18,7 +18,11 @@ export const SPEC_MODEL_ALLOWLIST = {
   codex: MODEL_ALLOWLIST.codex,
 };
 export const ROLE_MODELS = { scout: MODEL_ALLOWLIST, spec: SPEC_MODEL_ALLOWLIST, implementation: MODEL_ALLOWLIST };
-export const DEFAULT_SPEC_SELECTION = { runner: "codex", model: "gpt-5.6-sol", effort: "high" };
+export const DEFAULT_MODEL = { claude: "claude-sonnet-5-5", codex: "gpt-6.1-sol" };
+export const SPEC_DEFAULT_MODEL = { claude: "claude-opus-5-5", codex: "gpt-6.1-sol" };
+export const DEFAULT_SELECTION = { runner: "claude", model: DEFAULT_MODEL.claude, effort: "high" };
+export const DEFAULT_READ_MODEL = DEFAULT_MODEL.claude;
+export const DEFAULT_SPEC_SELECTION = { runner: "codex", model: SPEC_DEFAULT_MODEL.codex, effort: "high" };
 
 function roleModels(role) {
   if (!Object.hasOwn(ROLE_MODELS, role)) throw new Error("Unknown agent role");

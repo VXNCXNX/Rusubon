@@ -1,4 +1,5 @@
 import { SCOUT_CHECKS, resolveScout, windowLabel } from "../../scout-scope.mjs";
+import { SPEC_MODEL_ALLOWLIST } from "../models.mjs";
 export const stateIcon = complete => `<span class="dot ${complete ? "on" : "off"}" aria-hidden="true"></span>`;
 export const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 export const ended = job => ["completed", "failed", "stopped", "needs_attention"].includes(job.status);
@@ -10,7 +11,10 @@ const statusDot = status => `<span class="dot ${dots[status] || "off"}" aria-hid
 export const badge = job => `<span class="badge ${escape(job.status)}">${escape(statuses[job.status] || job.status)}</span>`;
 export const date = value => new Date(value).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 export const duration = job => { const seconds = Math.max(0, Math.round(((job.finishedAt ? new Date(job.finishedAt) : Date.now()) - new Date(job.startedAt)) / 1000)); return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`; };
-export const modelLabel = id => ({ "claude-sonnet-5": "Sonnet 5", "claude-opus-5": "Opus 5", "claude-fable-5-1": "Fable 5.1", "gpt-5.6-luna": "GPT-5.6 Luna", "gpt-5.6-terra": "GPT-5.6 Terra", "gpt-5.6-sol": "GPT-5.6 Sol", "gpt-6-astra": "GPT-6 Astra" })[id] || id;
+// Past runs and usage rows still name models that left the allowlist.
+const RETIRED_LABELS = { "claude-sonnet-5": "Sonnet 5", "claude-opus-5": "Opus 5", "gpt-5.6-luna": "GPT-5.6 Luna", "gpt-5.6-terra": "GPT-5.6 Terra", "gpt-5.6-sol": "GPT-5.6 Sol" };
+const MODEL_LABELS = { ...RETIRED_LABELS, ...Object.fromEntries(Object.values(SPEC_MODEL_ALLOWLIST).flat().map(row => [row.id, row.label])) };
+export const modelLabel = id => MODEL_LABELS[id] || id;
 export const permissionLabel = mode => mode === "auto" ? "Auto" : mode === "ask" ? "Ask" : mode === "yolo" ? "YOLO" : "Invalid";
 export const option = (value, label, selected, disabled = false) => `<option value="${escape(value)}" ${selected ? "selected" : ""} ${disabled ? "disabled" : ""}>${escape(label)}</option>`;
 

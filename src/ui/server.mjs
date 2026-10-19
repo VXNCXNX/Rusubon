@@ -18,6 +18,7 @@ ASSETS.set("/refresh.js", ["refresh.js", "text/javascript"]);
 ASSETS.set("/interface.js", ["interface.js", "text/javascript"]);
 ASSETS.set("/scope.js", ["../../scout-scope.mjs", "text/javascript"]);
 ASSETS.set("/scout-scope.mjs", ["../../scout-scope.mjs", "text/javascript"]);
+ASSETS.set("/models.mjs", ["../models.mjs", "text/javascript"]);
 ASSETS.set("/scope-controls.js", ["scope-controls.js", "text/javascript"]);
 ASSETS.set("/usage.js", ["usage.js", "text/javascript"]);
 ASSETS.set("/usage.css", ["usage.css", "text/css"]);

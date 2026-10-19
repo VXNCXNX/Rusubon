@@ -11,7 +11,7 @@ import { runSkill } from "../run.mjs";
 import { runPr } from "../pr.mjs";
 import { inspectClaude, runClaude } from "./claude.mjs";
 import { inspectCodex, runCodex } from "./codex.mjs";
-import { MODEL_ALLOWLIST, validateSelection } from "./models.mjs";
+import { DEFAULT_READ_MODEL, MODEL_ALLOWLIST, validateSelection } from "./models.mjs";
 import { mustCommand, safeText } from "./process.mjs";
 import { assertSetupRevision, localPath, reportDetail, saveSetup, writeLocal } from "./workspace.mjs";
 import { preparePr } from "./pr-worktree.mjs";
@@ -56,7 +56,7 @@ async function runJob(input) {
     const connection = await inspect(config.runner, repo);
     if (!connection.authenticated) throw new Error(`Sign in to ${config.runner} to send this decline to PostHog. The finding stays open.`);
     if (!connection.mcp.some(row => row.connected)) throw new Error(`no PostHog tools. Connect the official PostHog MCP on ${config.runner} to send this decline. The finding stays open.`);
-    const model = config.runner === "claude" ? config.read.model || "claude-sonnet-5" : config.model;
+    const model = config.runner === "claude" ? config.read.model || DEFAULT_READ_MODEL : config.model;
     if (!model) throw new Error(`Save a ${config.runner} model in Setup to send this decline to PostHog. The finding stays open.`);
     const chosen = validateSelection({ runner: config.runner, model, effort: "low" }, connection.models);
     const run = async (_runner, prompt, options) => launch(chosen, prompt, { role: "scout", phase: options.phase, permissionMode: config.permissionMode, timeoutMs: options.timeoutMs });
@@ -119,7 +119,7 @@ async function runJob(input) {
   }
   if (input.kind === "scout") {
     if (selection.runner === "claude") {
-      config.read = { model: input.readModel || config.read.model || "claude-sonnet-5", effort: "low" };
+      config.read = { model: input.readModel || config.read.model || DEFAULT_READ_MODEL, effort: "low" };
       validateSelection({ runner: "claude", ...config.read }, connection.models);
     } else {
       config.read = { model: selection.model, effort: "low" };
