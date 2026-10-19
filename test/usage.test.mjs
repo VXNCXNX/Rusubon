@@ -122,7 +122,7 @@ test("Codex deltas use their UTC day while counting the same run once", () => {
 test("Claude cumulative modelUsage includes delegated models without adding main usage again", () => {
   const c = usageCollector({ ...job, selection: { runner: "claude", model: "claude-fable-5-1" } });
   const raw = { inputTokens: 100, outputTokens: 50, cacheReadInputTokens: 1000, cacheCreationInputTokens: 200, costUSD: 0.125, costBasis: "list" };
-  const e = { type: "usage", at, sessionId: "claude-1", usage: { input_tokens: 9000, output_tokens: 9000 }, modelUsage: { "claude-fable-5-1": raw, "claude-sonnet-5": { ...raw, costUSD: 0.025 } } };
+  const e = { type: "usage", at, sessionId: "claude-1", usage: { input_tokens: 9000, output_tokens: 9000 }, modelUsage: { "claude-fable-5-1": raw, "claude-sonnet-5-5": { ...raw, costUSD: 0.025 } } };
   c.push(e); c.push(e);
   const result = aggregate([{ job, ...c.result() }]);
   assert.equal(result.total.tokens.total, 2700);
@@ -155,7 +155,7 @@ test("unknown models and guessed provider costs remain unavailable", () => {
 });
 
 test("legacy Claude coverage and phases stopped before usage are marked incomplete", () => {
-  const c = usageCollector({ ...job, selection: { runner: "claude", model: "claude-sonnet-5" } });
+  const c = usageCollector({ ...job, selection: { runner: "claude", model: "claude-sonnet-5-5" } });
   c.push({ type: "usage", at, usage: { input_tokens: 100, output_tokens: 10 } });
   c.push({ type: "session", runner: "claude", sessionId: "stopped-phase", at });
   const result = aggregate([{ job, ...c.result() }, { job: { ...job, id: "ui-beef" }, records: [] }]);
@@ -191,7 +191,7 @@ test("rates are local, validated, revision-protected, and resettable", t => {
   const rate = { ...MODEL_RATES.at(-1), input: 8, revision: original.revision };
   const saved = saveUsageRate(repo, rate);
   assert.equal(saved.rates.at(-1).input, 8);
-  assert.equal(saved.rates.at(-1).longContext, 272000);
+  assert.deepEqual(saved.rates.at(-1).longContext, { threshold: 272_000, input: 2, output: 1.5 });
   assert.throws(() => saveUsageRate(repo, rate), /changed/);
   assert.throws(() => saveUsageRate(repo, { ...rate, revision: saved.revision, input: -1 }), /Rates/);
   const reset = saveUsageRate(repo, { ...rate, revision: saved.revision, reset: true });
@@ -219,14 +219,14 @@ test("usage API requires authentication and rejects linked history", async t => 
 });
 
 test("Claude adapter persists per-model cost and counters in the usage event", async () => {
-  const events = [], modelUsage = { "claude-sonnet-5": { inputTokens: 100, outputTokens: 20, costUSD: 0.1 } };
+  const events = [], modelUsage = { "claude-sonnet-5-5": { inputTokens: 100, outputTokens: 20, costUSD: 0.1 } };
   const createQuery = () => {
     const stream = (async function* () {
-      yield { type: "system", subtype: "init", model: "claude-sonnet-5", effort: "high", session_id: "usage-session" };
+      yield { type: "system", subtype: "init", model: "claude-sonnet-5-5", effort: "high", session_id: "usage-session" };
       yield { type: "result", subtype: "success", is_error: false, session_id: "usage-session", modelUsage, total_cost_usd: 0.1 };
     })(); stream.close = () => {}; return stream;
   };
-  await runClaude("fixture", { cwd: "/tmp", model: "claude-sonnet-5", effort: "high", emit: e => events.push(e), ask: async () => ({ allow: false }), createQuery });
+  await runClaude("fixture", { cwd: "/tmp", model: "claude-sonnet-5-5", effort: "high", emit: e => events.push(e), ask: async () => ({ allow: false }), createQuery });
   const usage = events.find(e => e.type === "usage");
   assert.deepEqual(usage.modelUsage, modelUsage);
   assert.equal(usage.sessionId, "usage-session");

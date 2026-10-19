@@ -18,7 +18,7 @@ import { scopeView } from "../src/ui/web/views.js";
 const now = new Date("2026-09-05T23:59:59.000Z");
 const context = "# Product\nAnalytics at https://product.example.\n\n# Money paths\n- /checkout\n- https://app.example/signup\n- /workspace/:id/billing\n\n# Intentional friction\nConfirm paid changes at /confirm.\n\n# Out of scope\n/admin\n";
 const workspace = { confirmed: true, context, config: { posthog: { projectId: "123", host: "eu" } } };
-const selection = { runner: "claude", model: "claude-sonnet-5", effort: "high" };
+const selection = { runner: "claude", model: "claude-sonnet-5-5", effort: "high" };
 const opts = { ...DEFAULT_SCOUT, checks: ["clicks"], focus: ["/checkout"], note: "Address validation changed." };
 const scope = () => ({ ...resolveScoutScope(opts, workspace, now), id: "scope-test" });
 const candidate = (s = scope()) => ({ sessionId: "session-1", signals: 4, paths: ["/checkout/address"], lastSignalAt: s.window.start, signalTypes: ["$rageclick"] });
