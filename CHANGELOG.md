@@ -40,6 +40,8 @@ has been published yet.
   Runs, the run page, Research, Setup and Usage follow the same tokens and
   type (docs/dashboard-design.md): hairline rules instead of cards, a serif for
   reading, square priority stamps, light and dark, down to phone widths.
+- Appearance control in Setup with Match the system, Light, and Dark. The
+  choice applies right away and stays in this browser, never in `rusubon.json`.
 - Dashboard inbox bridge. The "Pull from PostHog" button runs the same pull as
   `rusubon inbox pull`, and Decline on a `ph-` report sends the same negative
   feedback as `rusubon decline` before it archives the file. A failed send

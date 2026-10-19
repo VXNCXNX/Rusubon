@@ -18,6 +18,8 @@ All colors are `light-dark()` pairs in `src/ui/web/app.css`. Light first.
 | `--vermilion` | `#b9382c` | `#e07367` | the seal, P1, failures |
 | `--ochre` | `#9a6a12` | `#d8a452` | P2, waiting states |
 
+Choosing Light or Dark in Setup's Appearance control sets `data-theme` on the root, and `light-dark()` follows the `color-scheme` that attribute pins.
+
 No gradients. No drop shadows except the dialog. One radius for controls (5px) and one for dialogs and notices (10px). Panels are not cards: sections separate with a hairline rule and a small heading, never a box.
 
 ## Type
