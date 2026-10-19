@@ -113,6 +113,9 @@ Setup saves compare the revision of both configuration and context files. If
 either changed while the form was open, your edits stay in the form and the
 save is refused. View the current setup, then load it and reconcile your edits.
 
+Setup also has an Appearance control (Match the system, Light, or Dark) that
+applies right away and is saved in this browser, not in `rusubon.json`.
+
 In Runs, choose the PostHog project in Setup, then set the investigation:
 
 | Choice | What it controls |

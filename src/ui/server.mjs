@@ -24,6 +24,7 @@ ASSETS.set("/usage.js", ["usage.js", "text/javascript"]);
 ASSETS.set("/usage.css", ["usage.css", "text/css"]);
 ASSETS.set("/runs.css", ["runs.css", "text/css"]);
 ASSETS.set("/setup.css", ["setup.css", "text/css"]);
+ASSETS.set("/theme.js", ["theme.js", "text/javascript"]);
 const json = (res, data, code = 200) => { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(data)); };
 async function body(req) {
   if (!/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) throw new Error("Expected application/json");

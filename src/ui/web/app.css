@@ -20,6 +20,9 @@
   --stamp-3: light-dark(#6f786f, #8e978e);
   --stamp-3-line: light-dark(#9aa39a, #4e574f);
   --code-bg: light-dark(#f1f3ef, #10130f);
+  /* light-dark() takes colors only, so the select chevron image switches through --chevron. */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23656c66' stroke-width='1.5'/%3E%3C/svg%3E");
+  --chevron-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2399a196' stroke-width='1.5'/%3E%3C/svg%3E");
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --serif: Charter, "Iowan Old Style", "Source Serif Pro", Georgia, serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -30,6 +33,9 @@
   --pad: 24px;
   --ease: cubic-bezier(0.2, 0, 0, 1);
 }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; --chevron: var(--chevron-dark); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --chevron: var(--chevron-dark); } }
 
 /* Base */
 * { box-sizing: border-box; }
@@ -115,8 +121,7 @@ label { display: grid; gap: 5px; font-size: 12.5px; color: var(--muted); }
 label > span:first-child { color: var(--muted); }
 input, select, textarea { width: 100%; min-height: 32px; padding: 5px 9px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-size: 13.5px; }
 textarea { resize: vertical; line-height: 1.5; }
-select { appearance: none; -webkit-appearance: none; padding-right: 26px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23656c66' stroke-width='1.5'/%3E%3C/svg%3E"); background-position: right 9px center; background-size: 10px 6px; background-repeat: no-repeat; }
-@media (prefers-color-scheme: dark) { select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2399a196' stroke-width='1.5'/%3E%3C/svg%3E"); } }
+select { appearance: none; -webkit-appearance: none; padding-right: 26px; background-image: var(--chevron); background-position: right 9px center; background-size: 10px 6px; background-repeat: no-repeat; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--moss); outline-offset: 0; border-color: var(--moss); }
 input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; min-height: 0; margin: 0; accent-color: var(--moss); }
 label.checkbox { grid-template-columns: auto 1fr; align-items: start; gap: 10px; color: var(--ink); font-size: 13.5px; cursor: pointer; }

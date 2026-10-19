@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark"><title>Rusubon</title>
+  <script src="/theme.js"></script>
   <link rel="icon" href="data:,"><link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/runs.css"><link rel="stylesheet" href="/setup.css"><link rel="stylesheet" href="/usage.css"><script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -88,6 +89,7 @@
             <div class="save-row"><span class="caption" id="saved-selection"></span><button class="btn primary" type="submit" id="save-setup">Save setup</button></div>
           </form>
           <div class="section draft-context"><h2>Let your agent propose the context</h2><p class="caption">Your scout agent reads this repository and drafts the product context above for you to review. Available until the context is confirmed.</p><form id="context-form"><label>What does this product do?<textarea name="about" rows="3" placeholder="Who uses it, and what should they be able to do?"></textarea></label><button id="draft-context" type="submit" class="btn">Draft product context</button></form></div>
+          <div class="section appearance"><h2>Appearance</h2><div class="form-grid"><label>Theme<select id="theme-select"><option value="system">Match the system</option><option value="light">Light</option><option value="dark">Dark</option></select></label><p class="caption field-note">Applies right away, in this browser only.</p></div></div>
         </div>
       </section>
 
