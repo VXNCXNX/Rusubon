@@ -98,10 +98,10 @@ export async function pullInbox(config, probes, { run = runWith, runId, limit = 
   const close = closeOutBody("pull", new Date(), closeOut);
   if (close.body == null) throw new Error(`pull did not write ${closeOut}`);
   const missingTools = close.body.trimStart().toLowerCase().startsWith("no posthog tools");
-  const pulled = missingTools ? { written: [], skipped: [] } : readPull(runId, runDir);
-  // Declined locally stays declined, even when the runner ignores the skip list.
+  // Declined locally stays declined, even when the runner ignores the skip list or writes a bad pull.json.
   const removed = archivedSlugs.filter(slug => existsSync(join(reportsDir(), `${slug}.md`)));
   for (const slug of removed) unlinkSync(join(reportsDir(), `${slug}.md`));
+  const pulled = missingTools ? { written: [], skipped: [] } : readPull(runId, runDir);
   onEvent({ type: "phase", name: "Inbox pull", status: "completed" });
   const summary = summarizeRun({ skillName: "pull", startedAt, before, closeOut });
   const out = { ...summary, runId, written: pulled.written.filter(slug => !removed.includes(slug)), skipped: pulled.skipped, removed, missingTools };

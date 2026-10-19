@@ -132,8 +132,12 @@ export async function runBridgeStep({ step, config, reportId, reportUrl, runId, 
     try { parsed = readBridgeResult(join(dir, `bridge-${step}.json`), runId, step, reportId); }
     catch (error) { resultError = error; }
   }
-  if (outcome.status !== 0 || outcome.timedOut) throw new Error(`${name} runner ${outcome.timedOut ? "timed out" : `exited ${outcome.status}`}`);
-  if (resultError) throw resultError;
+  // A valid ok result proves the write happened; a late non-zero exit must not hide a claim_id the caller has to release.
+  if (resultError) {
+    if (outcome.status !== 0 || outcome.timedOut) throw new Error(`${name} runner ${outcome.timedOut ? "timed out" : `exited ${outcome.status}`}: ${resultError.message}`);
+    throw resultError;
+  }
+  if (outcome.status !== 0 || outcome.timedOut) console.log(`${name} runner ${outcome.timedOut ? "timed out" : `exited ${outcome.status}`} after writing a valid result; continuing`);
   onEvent({ type: "phase", name, status: "completed" });
   return parsed;
 }

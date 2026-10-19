@@ -18,6 +18,13 @@ export function parseReport(text, fallbackTitle = "") {
   return { title, priority, priorityExplanation, actionability, source, posthogReport, posthogUrl };
 }
 
+/** The PostHog report a mirrored file points at, or null for any other report. */
+export function posthogRef(slug, text) {
+  const { source, posthogReport, posthogUrl } = parseReport(text);
+  if (!String(slug).startsWith("ph-") || source !== "posthog" || !posthogReport) return null;
+  return { id: posthogReport, url: posthogUrl };
+}
+
 export function inboxSlug(path) {
   return path.slice(path.lastIndexOf("/") + 1).replace(/\.md$/, "");
 }

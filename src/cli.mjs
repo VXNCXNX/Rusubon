@@ -4,7 +4,7 @@ import { initConfig, loadConfig, CONFIG_NAME } from "./config.mjs";
 import { draftContext } from "./context-draft.mjs";
 import { decline } from "./decline.mjs";
 import { collectChecks, formatDoctor } from "./doctor.mjs";
-import { listInbox, parseReport, printInbox, printShow, showReport } from "./inbox.mjs";
+import { listInbox, posthogRef, printInbox, printShow, showReport } from "./inbox.mjs";
 import { pullInbox } from "./inbox-pull.mjs";
 import { remember } from "./memory.mjs";
 import { runBridgeStep } from "./pr-bridge.mjs";
@@ -151,11 +151,11 @@ export async function main(argv) {
       return withRepoLock(process.cwd(), async () => {
         // Feedback goes first: a failed send leaves the report open so the command can be retried.
         const report = showReport(slug);
-        const { posthogReport, posthogUrl } = report.where === "reports" ? parseReport(report.body) : {};
-        if (posthogReport) {
+        const posthog = report.where === "reports" ? posthogRef(report.slug, report.body) : null;
+        if (posthog) {
           const runId = `decline-${randomUUID()}`;
-          await runBridgeStep({ step: "feedback", config: loadConfig(), reportId: posthogReport, reportUrl: posthogUrl, runId, runDir: `.rusubon/runs/${runId}`, note: parsed.value });
-          console.log(`sent as negative feedback to PostHog report ${posthogReport}`);
+          await runBridgeStep({ step: "feedback", config: loadConfig(), reportId: posthog.id, reportUrl: posthog.url, runId, runDir: `.rusubon/runs/${runId}`, note: parsed.value });
+          console.log(`sent as negative feedback to PostHog report ${posthog.id}`);
         }
         const result = decline(slug, parsed.value);
         console.log(`archived ${result.slug}; wrote .rusubon/memory/noise/${result.slug}.md`);
