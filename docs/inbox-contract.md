@@ -222,7 +222,7 @@ PostHog's self-driving inbox accepts external MCP agents since September 2026. R
 
 `rusubon pr ph-<id>` runs the Research-to-PR flow below with three extra runner passes, each a single MCP call with a JSON result the harness validates: `claim` (`inbox-reports-claim`) before research, so the PostHog inbox shows who owns the report and PostHog's own agent does not open a competing PR; `attach` after the draft PR exists (`inbox-reports-claim` with the PR url and `release: true`); `release` when research or implementation ends without a PR, or on a workflow failure after a successful claim. A report another actor holds fails the claim; Rusubon never passes `takeover`. PostHog resolves the report itself once the linked PR merges. The research skill treats the mirrored file as it treats a friction report.
 
-`rusubon decline ph-<id> --why "…"` archives the file and writes `memory/noise` exactly as for a local report, then sends the why as a negative `inbox-reports-feedback-create` so the scout that filed the report reads it on its next run. It does not dismiss or resolve the report in PostHog; that stays a decision taken in PostHog. The dashboard's Decline button does not yet forward feedback.
+`rusubon decline ph-<id> --why "…"` first sends the why as a negative `inbox-reports-feedback-create`, so the scout that filed the report reads it on its next run, and only then archives the file and writes `memory/noise` exactly as for a local report. A failed send leaves the report open, so the command can be retried; a report already in the archive sends nothing. It does not dismiss or resolve the report in PostHog; that stays a decision taken in PostHog. The dashboard's Decline button does not yet forward feedback.
 
 ## Research-to-PR execution
 

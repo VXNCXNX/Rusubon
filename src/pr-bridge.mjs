@@ -72,7 +72,7 @@ export function buildBridgePrompt({ step, config, reportId, reportUrl, runId, ru
   return redact(`You are running one Rusubon PostHog inbox step: ${step}. This is not a scout and not research.
 
 # Contract
-Official PostHog MCP only. Call \`${tool}\` (or CLI-mode \`exec\` → \`call ${tool}\`) exactly once with the arguments below. ${purpose}
+Official PostHog MCP only. If the current PostHog project is not ${config.posthog.projectId}, call \`switch-project\` to it first. Then call \`${tool}\` (or CLI-mode \`exec\` → \`call ${tool}\`) exactly once with the arguments below. ${purpose}
 Call no other PostHog tool. Never pass \`takeover\`. Never edit, dismiss or resolve the report, and never author a report. Do not open a PR, GitHub issue, or Linear item. Do not make HTTP requests.
 After a confirmed success, do not call the tool again.
 If the PostHog tools are missing, write the result file with ok false and a detail that **starts with** \`no PostHog tools\`, then stop. If the call fails, including a claim held by another actor, write ok false with the tool's error as detail.

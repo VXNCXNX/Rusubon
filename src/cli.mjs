@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { takeFlag, takeOption, readStdin } from "./argv.mjs";
 import { initConfig, loadConfig, CONFIG_NAME } from "./config.mjs";
 import { draftContext } from "./context-draft.mjs";
@@ -150,13 +149,16 @@ export async function main(argv) {
         throw new Error('usage: rusubon decline <slug> --why "…"');
       }
       return withRepoLock(process.cwd(), async () => {
+        // Feedback goes first: a failed send leaves the report open so the command can be retried.
+        const report = showReport(slug);
+        const { posthogReport, posthogUrl } = report.where === "reports" ? parseReport(report.body) : {};
+        if (posthogReport) {
+          const runId = `decline-${randomUUID()}`;
+          await runBridgeStep({ step: "feedback", config: loadConfig(), reportId: posthogReport, reportUrl: posthogUrl, runId, runDir: `.rusubon/runs/${runId}`, note: parsed.value });
+          console.log(`sent as negative feedback to PostHog report ${posthogReport}`);
+        }
         const result = decline(slug, parsed.value);
         console.log(`archived ${result.slug}; wrote .rusubon/memory/noise/${result.slug}.md`);
-        const { posthogReport, posthogUrl } = parseReport(readFileSync(result.archive, "utf8"));
-        if (!posthogReport) return;
-        const runId = `decline-${randomUUID()}`;
-        await runBridgeStep({ step: "feedback", config: loadConfig(), reportId: posthogReport, reportUrl: posthogUrl, runId, runDir: `.rusubon/runs/${runId}`, note: parsed.value });
-        console.log(`sent as negative feedback to PostHog report ${posthogReport}`);
       });
     }
     case "inbox": {
