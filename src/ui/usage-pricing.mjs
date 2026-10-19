@@ -2,16 +2,22 @@ import { createHash } from "node:crypto";
 import { readRawLocal, writeLocal } from "./workspace.mjs";
 import { ensureGitignore, USAGE_RATES_PATH } from "../config.mjs";
 
-export const PRICING_CHECKED_AT = "2026-09-05";
+export const PRICING_CHECKED_AT = "2026-10-19";
 const claudeSource = "https://platform.claude.com/docs/en/about-claude/pricing";
-const claude = (model, input, output, cacheRead, cacheWrite, cacheWrite1h) => ({ runner: "claude", model, input, output, cacheRead, cacheWrite, cacheWrite1h, source: claudeSource });
-const codex = (model, input, output, cacheRead) => ({ runner: "codex", model, input, output, cacheRead, cacheWrite: input * 1.25, cacheWrite1h: null, longContext: 272_000, source: `https://developers.openai.com/api/docs/models/${model}` });
+const claude = (model, input, output, cacheRead, cacheWrite, cacheWrite1h, longContext = null) => ({ runner: "claude", model, input, output, cacheRead, cacheWrite, cacheWrite1h, longContext, source: claudeSource });
+const codex = (model, input, output, cacheRead) => ({ runner: "codex", model, input, output, cacheRead, cacheWrite: input * 1.25, cacheWrite1h: null, longContext: { threshold: 272_000, input: 2, output: 1.5 }, source: `https://developers.openai.com/api/docs/models/${model}` });
 // USD per million tokens. Exact model keys only, never substitute a nearby model.
+// longContext input and output are multipliers on the row's rates, not rates.
 export const MODEL_RATES = [
+  claude("claude-haiku-5-5", 0.1, 0.5, 0.01, 0.125, 0.2, { threshold: 100_000, input: 5, output: 5 }),
+  claude("claude-sonnet-5-5", 2, 10, 0.1, 2.5, 4),
+  claude("claude-opus-5-5", 4, 20, 0.2, 5, 8),
   claude("claude-sonnet-5", 2, 10, 0.2, 2.5, 4),
   claude("claude-opus-5", 5, 25, 0.5, 6.25, 10),
   claude("claude-fable-5-1", 10, 50, 0.25, 12.5, 20),
   claude("claude-fable-5", 10, 50, 1, 12.5, 20),
+  codex("gpt-6-luna", 0.1, 0.5, 0.01),
+  codex("gpt-6.1-sol", 2, 10, 0.1),
   codex("gpt-5.6-luna", 0.2, 1.2, 0.02),
   codex("gpt-5.6-terra", 2, 12, 0.2),
   codex("gpt-5.6-sol", 4, 20, 0.4),
@@ -29,7 +35,7 @@ export function pricingState(repo) {
   for (const row of Object.values(overrides)) {
     validateRate(row);
     const index = rates.findIndex(rate => rate.runner === row.runner && rate.model === row.model);
-    const entry = { ...(index < 0 ? {} : rates[index]), runner: row.runner, model: row.model, ...Object.fromEntries(keys.map(key => [key, row[key]])), custom: true };
+    const entry = { ...(index < 0 ? { longContext: null } : rates[index]), runner: row.runner, model: row.model, ...Object.fromEntries(keys.map(key => [key, row[key]])), custom: true };
     if (index < 0) rates.push(entry); else rates[index] = entry;
   }
   return { rates, revision: revision(raw), checkedAt: PRICING_CHECKED_AT };
@@ -63,10 +69,10 @@ export function estimateCost(record, rates) {
   if (!rate || record.invalid) return { cost: null, basis: "unavailable" };
   const t = record.tokens;
   let inputMultiplier = 1, outputMultiplier = 1;
-  if (rate.longContext && t.input + t.cacheRead + t.cacheWrite > rate.longContext) {
+  if (rate.longContext && t.input + t.cacheRead + t.cacheWrite > rate.longContext.threshold) {
     // A cumulative catch-up can contain several requests with different tiers.
     if (!record.singleRequest) return { cost: null, basis: "unavailable" };
-    inputMultiplier = 2; outputMultiplier = 1.5;
+    inputMultiplier = rate.longContext.input; outputMultiplier = rate.longContext.output;
   }
   let writes = t.cacheWrite * rate.cacheWrite;
   if (record.runner === "claude" && t.cacheWrite) {
