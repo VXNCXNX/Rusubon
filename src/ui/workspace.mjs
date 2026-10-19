@@ -130,9 +130,12 @@ export function reportDetail(repo, slug) {
         ? { id: parsed.posthogReport, url: parsed.posthogUrl, status: (header.match(/^posthog_status:\s*(\S+)/im) || [])[1] || "", priority: ((header.match(/^posthog_priority:\s*(P[0-4])\b/im) || [])[1] || "").toUpperCase() }
         : null;
       const pulledAt = posthog ? (body.match(/^## Pulled\s*\n+\s*(\d{4}-\d{2}-\d{2}T[\d:.]+Z)/m) || [])[1] || "" : "";
-      let display = body.replace(/^priority:\s*P[123]\s*$/gmi, "").replace(/^actionability:\s*\S+\s*$/gmi, "").replace(/^priority_explanation:\s*.+$/gmi, "");
-      if (posthog) display = display.replace(/^(source|posthog_report|posthog_url|posthog_status|posthog_priority):\s*.*$/gmi, "").replace(/\n## Pulled\n[\s\S]*?(?=\n## |$)/, "");
-      if (parsed.title) display = display.replace(/^#\s+.+$/m, "");
+      // Strip the metadata lines from the header only; a section quoting "source:" or "priority:" is evidence and stays verbatim.
+      let head = header.replace(/^priority:\s*P[123]\s*$/gmi, "").replace(/^actionability:\s*\S+\s*$/gmi, "").replace(/^priority_explanation:\s*.+$/gmi, "");
+      if (posthog) head = head.replace(/^(source|posthog_report|posthog_url|posthog_status|posthog_priority):\s*.*$/gmi, "");
+      if (parsed.title) head = head.replace(/^#\s+.+$/m, "");
+      let display = head + body.slice(header.length);
+      if (posthog) display = display.replace(/\n## Pulled\n[\s\S]*?(?=\n## |$)/, "");
       const modifiedAt = statSync(localPath(repo, path)).mtime.toISOString();
       return { slug, path, archived: folder === "archive", ...parsed, posthog, pulledAt, modifiedAt, body, html: renderMarkdown(display), explanationHtml: parsed.priorityExplanation ? renderInline(parsed.priorityExplanation) : "" };
     }
