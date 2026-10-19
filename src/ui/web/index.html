@@ -48,7 +48,7 @@
             <p id="scope-error" class="caption scope-error" role="status" hidden></p>
             <div class="launch-bottom"><div><p id="launch-summary" class="launch-summary" role="status"></p><span id="launch-help" class="caption"></span></div><button id="launch-scout" type="button" class="btn primary" disabled>Launch scout</button></div>
           </div>
-          <aside class="recent"><div class="section"><h2>Recent runs</h2><div id="run-list" class="rows"></div></div></aside>
+          <aside class="recent" aria-labelledby="recent-title"><div class="recent-scroll"><h2 id="recent-title">Recent runs</h2><div id="run-list" class="rows"></div></div></aside>
         </div>
       </section>
 
@@ -93,9 +93,9 @@
 
       <section id="page-usage" hidden aria-labelledby="usage-title"></section>
 
-      <section id="page-job" hidden aria-labelledby="job-title">
+      <section id="page-job" class="job" hidden aria-labelledby="job-title">
         <header class="bar"><button type="button" class="link back" data-page="runs">All runs</button><h1 id="job-title">Run</h1><div class="bar-end" id="job-bar"></div></header>
-        <div class="column wide"><div id="job-detail"></div><div id="requests"></div><div id="job-activity"></div><div id="job-artifacts"></div></div>
+        <div class="column"><div id="job-detail"></div><div id="requests"></div><div id="job-activity"></div><div id="job-artifacts"></div></div>
       </section>
     </main>
   </div>

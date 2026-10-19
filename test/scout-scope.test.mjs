@@ -143,7 +143,7 @@ test("saved scope survives config reload and both phases keep the frozen source,
   assert.match(saved.id, /^[a-f0-9]{64}$/);
   for (const call of calls) { assert.ok(call.prompt.includes(saved.id)); assert.ok(call.prompt.includes(saved.window.start)); assert.ok(call.prompt.includes(JSON.stringify(context))); assert.doesNotMatch(call.prompt, /Different product/); }
   assert.match(calls[1].prompt, /session-1/);
-  assert.match(scopeView(saved), /PostHog · Project 123 · EU/);
+  assert.match(scopeView(saved), /PostHog project 123, EU/);
   assert.match(scopeView({ ...saved, options: { ...opts, note: "<script>bad</script>" } }), /&lt;script&gt;/);
 });
 

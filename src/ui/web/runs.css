@@ -1,0 +1,119 @@
+/* Runs and Job pages. Tokens live in app.css, rules in docs/dashboard-design.md */
+
+/* Runs: the launch brief beside recent runs */
+.runs-layout { display: grid; grid-template-columns: minmax(0, calc(720px + 2 * var(--pad))) 320px; flex: 1; }
+.launch { min-width: 0; padding: 22px var(--pad) 48px; }
+.launch .scope-source { margin-top: 0; padding-top: 0; border-top: 0; }
+.launch .caption:empty { display: none; }
+.launch legend { margin-bottom: 10px; }
+.scope-source p { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 13.5px; }
+.scope-source strong { font-weight: 500; }
+.scope-grid, .launch .model-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; }
+.scope-grid + .scope-grid { margin-top: 12px; }
+.scope-dates, #scout-focus-help, #scout-history, #model-help { margin-top: 8px; }
+.check-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.check-grid input { margin-top: 2px; }
+.check-grid code { background: none; padding: 0; font-size: 12.5px; }
+.check-grid label:has(input:disabled) { color: var(--muted); cursor: default; }
+.scope-paths { margin-top: 14px; }
+.scope-note summary { width: fit-content; font-size: 13px; font-weight: 600; cursor: pointer; }
+.scope-note summary::marker { color: var(--faint); }
+.scope-note summary .caption { margin-left: 6px; font-weight: 400; }
+.scope-note[open] summary { margin-bottom: 10px; }
+.scope-error { margin-top: 16px; color: var(--vermilion); }
+.launch-bottom { display: flex; align-items: center; gap: 16px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.launch-summary { font-size: 13.5px; }
+.launch-bottom .caption { display: block; margin-top: 2px; }
+.launch-bottom .btn { flex: none; margin-left: auto; padding: 7px 16px; }
+
+/* Runs: recent runs */
+.recent { min-width: 0; border-left: 1px solid var(--rule); }
+.recent-scroll { position: sticky; top: var(--bar); max-height: calc(100vh - var(--bar)); overflow-y: auto; padding-bottom: 24px; }
+.recent h2 { padding: 22px 16px 10px; font-size: 13px; }
+.recent .rows { border-top: 1px solid var(--rule-soft); }
+.recent .empty { padding: 16px; }
+.run-row { grid-template-columns: 7px minmax(0, 1fr) auto; gap: 11px; padding: 11px 16px 11px 14px; align-items: start; }
+.run-row > .dot { margin-top: 6px; }
+.run-outcome { display: block; margin-top: 2px; font-size: 12.5px; }
+.run-row .meta { gap: 2px 10px; margin-top: 3px; }
+.run-row code { background: none; padding: 0; font-size: 11.5px; color: var(--muted); }
+.run-status { padding-top: 1px; white-space: nowrap; }
+.run-status.failed { color: var(--vermilion); }
+.run-status.waiting, .run-status.needs_attention { color: var(--ochre); }
+
+/* Job: head, notices, paths */
+.job .notice { margin: 16px 0 0; }
+.job-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; }
+.job-date { font-size: 13.5px; font-weight: 500; }
+.job-meta { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.job-meta code { background: none; padding: 0; font-size: 12px; }
+.job-actions { display: flex; align-items: center; gap: 14px; }
+.job-path { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.job-path code { min-width: 0; background: none; padding: 0; font-size: 12px; color: var(--ink); overflow-wrap: anywhere; }
+
+/* Job: run outcome */
+.outcome-title { font: 400 22px/1.25 var(--serif); letter-spacing: -0.01em; }
+.outcome-text { max-width: 68ch; margin-top: 6px; }
+.outcome-counts { margin-top: 6px; }
+.scout-outcome .actions { margin-top: 14px; }
+
+/* Job: investigation */
+.pairs > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; padding: 8px 0; border-top: 1px solid var(--rule-soft); }
+.pairs > div:first-child { padding-top: 2px; border-top: 0; }
+.pairs dt { padding-top: 1px; font-size: 12.5px; color: var(--muted); }
+.pairs dd { min-width: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.pairs dd small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.pairs dd code { background: none; padding: 0; font-size: 12.5px; }
+.scope-context, .runner-detail { margin-top: 12px; }
+.scope-context summary, .runner-detail summary { width: fit-content; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.scope-context summary:hover, .runner-detail summary:hover { color: var(--ink); }
+.scope-context .caption { margin: 8px 0; }
+.scope-context pre, .runner-detail pre { max-height: 360px; margin-top: 8px; }
+
+/* Job: progress stepper */
+.steps { display: grid; margin: 0; padding: 0; list-style: none; }
+.steps li { position: relative; display: grid; grid-template-columns: 7px auto minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 7px 0; font-size: 13.5px; }
+.steps .dot { align-self: start; margin-top: 6px; }
+.steps li:not(:last-child)::after { content: ""; position: absolute; left: 3px; top: 24px; bottom: -9px; width: 1px; background: var(--rule); }
+
+/* Job: agent questions */
+.request { display: grid; gap: 12px; margin-top: 18px; padding: 16px 18px; border-left: 3px solid var(--moss); border-radius: var(--radius-lg); background: var(--surface); }
+.request h2 { font-size: 13px; }
+.request-title { margin-top: -6px; font-size: 15px; font-weight: 500; }
+.request fieldset { display: grid; gap: 8px; }
+.request legend { margin-bottom: 2px; font-size: 14px; font-weight: 500; }
+.request label { max-width: 520px; }
+.choice { grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 10px; padding: 3px 0; font-size: 13.5px; color: var(--ink); cursor: pointer; }
+.choice input { margin-top: 2px; }
+.choice small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--muted); }
+.request [role="status"]:empty { display: none; }
+.request pre { max-height: 280px; }
+
+/* Job: agent activity */
+.activity { display: grid; max-width: 76ch; }
+.activity > * + * { border-top: 1px solid var(--rule-soft); }
+.activity-message { padding: 10px 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.activity-model { padding: 7px 0; }
+.tool summary { padding: 7px 0; font: 12.5px/1.4 var(--mono); cursor: pointer; overflow-wrap: anywhere; }
+.tool summary::marker { color: var(--faint); }
+.tool summary:hover { color: var(--moss); }
+.tool-status { margin-left: 10px; font: 12px var(--sans); color: var(--muted); }
+.tool-status.failed { color: var(--vermilion); }
+.tool pre { max-height: 320px; margin-bottom: 10px; }
+
+/* Narrow screens */
+@media (max-width: 1100px) {
+  .runs-layout { grid-template-columns: minmax(0, calc(720px + 2 * var(--pad))); }
+  .launch { padding-bottom: 8px; }
+  .recent { border-left: 0; }
+  .recent-scroll { position: static; max-height: none; overflow: visible; }
+  .recent h2 { padding: 18px var(--pad) 10px; border-top: 1px solid var(--rule); }
+  .recent .run-row { padding-left: calc(var(--pad) - 2px); padding-right: var(--pad); }
+  .recent .empty { padding: 16px var(--pad); }
+}
+@media (max-width: 640px) {
+  .scope-grid, .launch .model-controls { grid-template-columns: minmax(0, 1fr); }
+  .launch-bottom { flex-wrap: wrap; }
+  .launch-bottom .btn { width: 100%; justify-content: center; margin-left: 0; }
+  .pairs > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}

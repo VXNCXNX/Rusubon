@@ -27,8 +27,8 @@ test("a completed empty scout explains its outcome before progress, including sa
 test("nonempty outcomes count new and updated findings and offer the inbox", () => {
   const html = jobView({ ...job, selection: { runner: "claude" }, result: { ...job.result, reports: [{ key: "checkout", kind: "new" }, { key: "pricing", kind: "updated" }], memory: [{ key: "noise/test", kind: "new" }] } });
   assert.match(html, /2 findings filed/);
-  assert.match(html, /1 new · 1 updated · 1 memory update/);
-  assert.match(html, /data-page="findings"[^>]*>View findings/);
+  assert.match(html, /1 new, 1 updated, 1 memory update\./);
+  assert.match(html, /data-page="inbox"[^>]*>View findings/);
   assert.doesNotMatch(html, /SQL analysis only|No findings filed/);
 });
 
@@ -82,7 +82,7 @@ test("View findings restores the open list after viewing a report or archived fi
     };
     runInNewContext(dispatcher, context);
     await click({ target: { closest: () => ({ dataset }) } });
-    assert.equal(context.page, "findings");
+    assert.equal(context.page, "inbox");
     assert.equal(context.report, null);
     assert.equal(renderedFilter, "open");
     assert.deepEqual(tabs.map(tab => tab["aria-pressed"]), ["true", "false"]);
