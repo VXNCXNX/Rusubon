@@ -84,7 +84,13 @@ async function runJob(input) {
     }
     if (!state.mcp?.some(row => row.connected)) {
       emit({ type: "message", text: "Authorize the official PostHog connection in your browser." });
-      await mustCommand(bin, ["mcp", "login", name], { cwd: repo, signal: controller.signal, timeoutMs: 5 * 60_000, onLine });
+      try {
+        await mustCommand(bin, ["mcp", "login", name], { cwd: repo, signal: controller.signal, timeoutMs: 5 * 60_000, onLine });
+      } catch (error) {
+        // Claude Code completes MCP OAuth only from a terminal, and the dashboard has none to give it.
+        if (/isn't a terminal|not a terminal|not a tty/i.test(error.message)) throw new Error(`${input.runner === "claude" ? "Claude Code" : "Codex"} finishes this authorization only in a terminal. Run \`${input.runner} mcp login ${name}\` in a terminal, approve PostHog in the browser, then choose Check again.`);
+        throw error;
+      }
     }
     return { message: "PostHog configured in your runner. Refresh the connection." };
   }

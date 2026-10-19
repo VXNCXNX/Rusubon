@@ -7,6 +7,9 @@ has been published yet.
 
 ### Included in the initial preview
 
+- Connect PostHog on Claude Code explains that Claude Code finishes MCP
+  authorization in a terminal and names the command, instead of showing the
+  raw CLI error.
 - Repository Usage section with daily token/cost charts, model/day breakdowns,
   separate cache read/write totals, verified model rates, and local overrides.
   Estimates cover saved dashboard runs and explicitly mark missing usage.

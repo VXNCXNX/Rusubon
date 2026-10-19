@@ -45,7 +45,7 @@ rusubon ui --repo /absolute/path/to/your-product
 A local browser page opens. Keep this terminal running. There is no frontend
 build, separate web server, or hosted Rusubon account to set up.
 
-1. Open **Setup**. Sign in to Claude Code or Codex if needed, then choose **Connect PostHog** for that runner and complete authorization in your browser.
+1. Open **Setup**. Sign in to Claude Code or Codex if needed, then choose **Connect PostHog** for that runner and complete authorization in your browser. Claude Code completes that authorization in a terminal: run the `claude mcp login` command the failed run shows (usually `claude mcp login rusubon-posthog`), approve PostHog, then choose **Check again**.
 2. Enter your PostHog project ID and US or EU region. Add product context, including actual URLs or paths under `# Money paths`, intentional friction, and exclusions. Confirm the context and click **Save setup**. This initializes Rusubon's files in your product repository.
 3. Open **Runs**. Choose the period, money paths, checks, and any additional context. Select your agent, model, and effort, then click **Launch scout**.
 4. Follow progress and answer agent questions on the run page. Open **Inbox** to review the evidence, or pull the reports PostHog has ready. **Research** holds the separate spec creator and implementation settings for a human-launched draft PR.
@@ -66,6 +66,7 @@ its active workers. Your setup, findings, and run history remain on disk.
 | Symptom | What to do |
 | --- | --- |
 | `rusubon: command not found`, or `npm link` cannot write to the global bin directory | Use `node /absolute/path/to/rusubon/bin/rusubon.mjs ui --repo /absolute/path/to/your-product`. Keep the Rusubon clone and its installed dependencies. |
+| **Connect PostHog** on Claude Code fails with "stdin isn't a terminal" | Claude Code completes MCP authorization only in a terminal. Run the `claude mcp login` command the failed run shows (usually `claude mcp login rusubon-posthog`; `claude mcp list` prints the configured name), approve PostHog in the browser, then choose **Check again**. A warning about `ANTHROPIC_API_KEY` or another auth source concerns claude.ai connectors only and does not block this step. |
 | The wrong repository appears | Stop the dashboard and restart with `--repo` pointing to your product's code. The repository path is shown in Setup. |
 | The browser did not open, or an old tab says it is disconnected | Open the full URL printed by the currently running command, including its token fragment. A restart creates a new URL token. |
 | A runner is missing or cannot sign in | Check that `claude` or `codex` works in the terminal that launches Rusubon. Install or sign in to that CLI, then refresh connections in Setup. |
