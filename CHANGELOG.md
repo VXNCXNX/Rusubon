@@ -29,6 +29,13 @@ has been published yet.
   links the draft PR and releases the claim. `rusubon decline ph-<id>` forwards
   the reason as negative feedback to the scout that filed it. Rusubon never
   authors, edits, dismisses or resolves a report in PostHog.
+- Dashboard redesign. Findings became the Inbox, a two-pane page with the
+  finding list beside the report and the Research or Decline decision pinned
+  under it. PostHog mirrors show their status, priority and pull time as facts
+  instead of raw header lines. Agent and PostHog state live in the sidebar.
+  Runs, the run page, Research, Setup and Usage follow the same tokens and
+  type (docs/dashboard-design.md): hairline rules instead of cards, a serif for
+  reading, square priority stamps, light and dark, down to phone widths.
 - Dashboard inbox bridge. The "Pull from PostHog" button runs the same pull as
   `rusubon inbox pull`, and Decline on a `ph-` report sends the same negative
   feedback as `rusubon decline` before it archives the file. A failed send

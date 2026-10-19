@@ -13,9 +13,9 @@ Early preview, version 0.1.0. Install from source below. The dashboard supports 
 Read https://raw.githubusercontent.com/VXNCXNX/Rusubon/main/SETUP-AGENT.md and set up Rusubon for this product repository.
 ```
 
-**Choose what to investigate, then launch with one click. Follow the evidence and your agent's progress in one place.**
+**Every finding arrives as a quantified note with its evidence. Read it, then research it into a draft PR or decline it with a reason.**
 
-![Rusubon scout launch with a PostHog project, date range, money paths, selectable checks, additional context, and compact agent controls.](docs/images/dashboard-launch.png)
+![Rusubon inbox: findings on the left with priority stamps, the selected report on the right with its facts row, evidence, and the Research or Decline decision bar.](docs/images/dashboard-inbox.png)
 
 *Screenshots use a demo workspace with illustrative data.*
 
@@ -84,9 +84,15 @@ rusubon ui --repo /path/to/product      # select a product repo
 rusubon ui --port 4242 --no-open         # print the URL without opening it
 ```
 
-**Follow each phase and answer your agent's questions directly in the dashboard.**
+**Choose what to investigate, then launch with one click.**
 
-![A scout run showing its saved investigation scope, phase progress, a product question, and live agent activity.](docs/images/dashboard-monitor.png)
+![Rusubon scout launch with a PostHog project, date range, money paths, selectable checks, additional context, agent controls, and recent runs beside it.](docs/images/dashboard-launch.png)
+
+**Follow each phase and read the outcome, the saved investigation, and the agent's activity on the run page.**
+
+![A completed scout run showing its outcome, saved investigation scope, phase progress, and agent activity.](docs/images/dashboard-monitor.png)
+
+The dashboard's look and the rules behind it are in [docs/dashboard-design.md](docs/dashboard-design.md).
 
 The dashboard binds to `127.0.0.1`. Use the full URL printed by the command. Its
 fragment contains the session token, which the browser keeps in session storage.
