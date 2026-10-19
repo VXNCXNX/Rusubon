@@ -247,8 +247,8 @@ test("HTTP authenticates every API, rejects cross-origin writes, serves assets, 
   jobs.stop(pr.id); await waitFor(() => terminalJob(jobs.get(pr.id)) && !jobs.active.size);
   const restored = new Jobs(repo).detail(pr.id);
   assert.deepEqual(restored.specSelection, specSelection); assert.deepEqual(restored.selection, implementation);
-  assert.match(jobView(restored), /Spec: Fable 5.1 · max/);
-  assert.match(jobView(restored), /Implementation: Codex · GPT-5.6 Luna · low/);
+  assert.match(jobView(restored), /Spec Claude Code, Fable 5.1, max/);
+  assert.match(jobView(restored), /Build Codex, GPT-5.6 Luna, low/);
 });
 
 test("Codex RPC paginates, routes notifications and approvals, rejects errors and closed connections", async t => {

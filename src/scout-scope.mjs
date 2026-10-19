@@ -102,7 +102,7 @@ export function resolveScoutScope(input, workspace, now = new Date()) {
 
 export function windowLabel(window) {
   const endDate = new Date(Date.parse(window.end) - DAY).toISOString().slice(0, 10);
-  return `${window.start.slice(0, 10)} to ${endDate} · UTC`;
+  return `${window.start.slice(0, 10)} to ${endDate}, UTC`;
 }
 
 export function pathPattern(value) {

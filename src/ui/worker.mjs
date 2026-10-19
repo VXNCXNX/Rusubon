@@ -4,11 +4,14 @@ import { MEMORY_PREFIXES } from "../paths.mjs";
 import { defaultProbes } from "../doctor.mjs";
 import { decline } from "../decline.mjs";
 import { draftContext } from "../context-draft.mjs";
+import { posthogRef } from "../inbox.mjs";
+import { formatPullSummary, pullInbox } from "../inbox-pull.mjs";
+import { runBridgeStep } from "../pr-bridge.mjs";
 import { runSkill } from "../run.mjs";
 import { runPr } from "../pr.mjs";
 import { inspectClaude, runClaude } from "./claude.mjs";
 import { inspectCodex, runCodex } from "./codex.mjs";
-import { validateSelection } from "./models.mjs";
+import { MODEL_ALLOWLIST, validateSelection } from "./models.mjs";
 import { mustCommand, safeText } from "./process.mjs";
 import { assertSetupRevision, localPath, reportDetail, saveSetup, writeLocal } from "./workspace.mjs";
 import { preparePr } from "./pr-worktree.mjs";
@@ -18,6 +21,11 @@ const supervisorPid = process.ppid;
 const send = message => { if (process.connected) process.send(message); };
 const emit = event => send({ type: "event", event });
 const inspect = (runner, cwd) => runner === "claude" ? inspectClaude(cwd) : inspectCodex(cwd);
+function launch(chosen, prompt, { role, phase, permissionMode, timeoutMs }) {
+  emit({ type: "model", ...chosen, role, phase });
+  const adapter = chosen.runner === "claude" ? runClaude : runCodex;
+  return adapter(prompt, { ...chosen, permissionMode, cwd: process.cwd(), signal: controller.signal, emit, ask, timeoutMs });
+}
 
 function ask(request, signal = controller.signal) {
   if (signal.aborted || !process.connected) return Promise.resolve({ allow: false });
@@ -37,10 +45,24 @@ async function runJob(input) {
   if (input.kind === "setup") { const result = saveSetup(repo, input.setup); initConfig(); return result; }
   if (input.kind === "init") { initConfig(); return { message: "Workspace initialized" }; }
   if (input.kind === "decline") {
-    reportDetail(repo, input.source.value);
-    localPath(repo, `.rusubon/inbox/archive/${input.source.value}.md`);
-    localPath(repo, `.rusubon/memory/noise/${input.source.value}.md`);
-    return decline(input.source.value, input.reason);
+    const slug = input.source.value, report = reportDetail(repo, slug);
+    localPath(repo, `.rusubon/inbox/archive/${slug}.md`);
+    localPath(repo, `.rusubon/memory/noise/${slug}.md`);
+    // Feedback goes first: a failed send leaves the report open so the decline can be retried.
+    const posthog = report.archived ? null : posthogRef(slug, report.body);
+    if (!posthog) return { ...decline(slug, input.reason), message: `Archived ${slug}` };
+    const config = loadConfig();
+    if (!Object.hasOwn(MODEL_ALLOWLIST, config.runner)) throw new Error(`The dashboard cannot reach PostHog through ${config.runner}. Run rusubon decline ${slug} in a terminal.`);
+    const connection = await inspect(config.runner, repo);
+    if (!connection.authenticated) throw new Error(`Sign in to ${config.runner} to send this decline to PostHog. The finding stays open.`);
+    if (!connection.mcp.some(row => row.connected)) throw new Error(`no PostHog tools. Connect the official PostHog MCP on ${config.runner} to send this decline. The finding stays open.`);
+    const model = config.runner === "claude" ? config.read.model || "claude-sonnet-5" : config.model;
+    if (!model) throw new Error(`Save a ${config.runner} model in Setup to send this decline to PostHog. The finding stays open.`);
+    const chosen = validateSelection({ runner: config.runner, model, effort: "low" }, connection.models);
+    const run = async (_runner, prompt, options) => launch(chosen, prompt, { role: "scout", phase: options.phase, permissionMode: config.permissionMode, timeoutMs: options.timeoutMs });
+    await runBridgeStep({ step: "feedback", config, reportId: posthog.id, reportUrl: posthog.url, runId: input.id, runDir: `.rusubon/runs/${input.id}`, note: input.reason, run, onEvent: emit });
+    emit({ type: "message", text: `Sent as negative feedback to PostHog report ${posthog.id}` });
+    return { ...decline(slug, input.reason), message: `Sent as negative feedback to PostHog report ${posthog.id}. Archived ${slug}` };
   }
   if (input.kind === "login") {
     const bin = input.runner === "claude" ? process.env.RUSUBON_CLAUDE || "claude" : "codex";
@@ -89,15 +111,13 @@ async function runJob(input) {
     const expected = selections[role];
     if (runner !== expected.runner) throw new Error(`Runner changed for ${role}`);
     const chosen = validateSelection({ runner, model: options.model || expected.model, effort: options.effort || expected.effort }, connections.get(runner).models, role);
-    emit({ type: "model", ...chosen, role, phase: options.phase || input.kind });
-    const adapter = chosen.runner === "claude" ? runClaude : runCodex;
-    return adapter(prompt, { ...chosen, permissionMode: config.permissionMode, cwd: process.cwd(), signal: controller.signal, emit, ask, timeoutMs: options.timeoutMs });
+    return launch(chosen, prompt, { role, phase: options.phase || input.kind, permissionMode: config.permissionMode, timeoutMs: options.timeoutMs });
   };
+  if (["scout", "inbox_pull"].includes(input.kind) && !official.length) {
+    writeLocal(repo, `.rusubon/runs/${input.id}/close-out.md`, `no PostHog tools\n\nConnect the official PostHog MCP on this runner before ${input.kind === "scout" ? "scouting" : "pulling the inbox"}.\n`);
+    throw new Error("no PostHog tools. Connect the official PostHog MCP on this runner.");
+  }
   if (input.kind === "scout") {
-    if (!official.length) {
-      writeLocal(repo, `.rusubon/runs/${input.id}/close-out.md`, "no PostHog tools\n\nConnect the official PostHog MCP on this runner before scouting.\n");
-      throw new Error("no PostHog tools. Connect the official PostHog MCP on this runner.");
-    }
     if (selection.runner === "claude") {
       config.read = { model: input.readModel || config.read.model || "claude-sonnet-5", effort: "low" };
       validateSelection({ runner: "claude", ...config.read }, connection.models);
@@ -105,6 +125,12 @@ async function runJob(input) {
       config.read = { model: selection.model, effort: "low" };
     }
     return runSkill(input.scoutScope?.options?.skill || "friction", config, probes, { run, runId: input.id, onEvent: emit, scope: input.scoutScope });
+  }
+  if (input.kind === "inbox_pull") {
+    // pullInbox runs the selected model and takes its effort from config.read.
+    config.read = { model: selection.model, effort: "low" };
+    const result = await pullInbox(config, probes, { run, runId: input.id, limit: input.limit, onEvent: emit });
+    return { ...result, message: formatPullSummary(result) };
   }
   if (input.kind === "context") return draftContext({ config, about: input.about, run });
   if (input.kind === "pr") {

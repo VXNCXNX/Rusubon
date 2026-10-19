@@ -4,18 +4,17 @@ import { updateMarkup } from "/interface.js";
 
 export function scopeControls(container, saved, onChange) {
   let draft = { ...DEFAULT_SCOUT, ...(saved && typeof saved === "object" ? saved : {}) }, workspace, runner;
-  container.innerHTML = `<div class="scope-source"><div><span class="field-label">Data source</span><strong id="scope-source-name"></strong></div><button class="text-button" type="button" data-page="setup">Change in Setup</button></div>
+  container.innerHTML = `<div class="section scope-source"><h2>Data source</h2><p><strong id="scope-source-name"></strong><button class="link" type="button" data-page="setup">Change in Setup</button></p></div>
     <fieldset class="scope-fields"><legend class="sr-only">Investigation scope</legend>
-      <div class="scope-investigation"><div class="scope-target">
+      <div class="section"><h2>Investigation</h2>
       <div class="scope-grid"><label>Scout<select id="scout-skill">${listScouts().map(row => `<option value="${escape(row.name)}">${escape(row.label)}</option>`).join("")}</select></label><label>Period<select id="scout-period"><option value="7d">Last 7 days</option><option value="14d">Last 14 days</option><option value="30d">Last 30 days</option><option value="custom">Custom dates</option></select></label><label>Focus<select id="scout-focus"><option value="all">All confirmed money paths</option><option value="selected">Choose paths</option></select></label></div>
       <div id="scout-custom-dates" class="scope-grid" hidden><label>From (UTC)<input type="date" id="scout-start"></label><label>Through (UTC)<input type="date" id="scout-end"></label></div>
       <p class="caption scope-dates"><span id="scout-window"></span> <span id="scout-baseline"></span></p>
-      <div id="scout-paths" class="scope-paths" hidden></div><p id="scout-focus-help" class="caption"></p>
-      </div><div class="scope-inspection">
-      <fieldset class="scope-checks"><legend>What to inspect</legend><div class="check-grid">${SCOUT_CHECKS.map(row => `<label class="scope-check"><input type="checkbox" value="${row.id}" data-check><span>${escape(row.label)}</span></label>`).join("")}</div></fieldset>
-      <p id="scout-history" class="caption"></p>
-      </div></div>
-      <details class="scope-note"><summary>Add context for this run</summary><label>Additional context<textarea id="scout-note" rows="2" maxlength="2000" placeholder="We changed checkout this week. Focus on address validation."></textarea></label></details>
+      <div id="scout-paths" class="check-grid scope-paths" hidden></div><p id="scout-focus-help" class="caption"></p>
+      </div>
+      <div class="section"><fieldset><legend>What to inspect</legend><div class="check-grid">${SCOUT_CHECKS.map(row => `<label class="checkbox scope-check"><input type="checkbox" value="${row.id}" data-check><span>${escape(row.label)}</span></label>`).join("")}</div></fieldset>
+      <p id="scout-history" class="caption"></p></div>
+      <div class="section"><details class="scope-note"><summary>Add context for this run <span class="caption">Optional</span></summary><label>Tell the scout what changed or where to look<textarea id="scout-note" rows="3" maxlength="2000" placeholder="We changed checkout this week. Focus on address validation."></textarea></label></details></div>
     </fieldset>`;
   const find = id => container.querySelector(`#${id}`);
   function set(value) {
@@ -39,11 +38,11 @@ export function scopeControls(container, saved, onChange) {
     workspace = w; runner = selectedRunner;
     container.querySelector(".scope-fields").disabled = busy;
     const host = w.config.posthog.host, region = /\beu\b/.test(host) ? "EU" : /\bus\b/.test(host) ? "US" : "region not set";
-    find("scope-source-name").textContent = w.config.posthog.projectId ? `PostHog · Project ${w.config.posthog.projectId} · ${region}` : "PostHog · choose a project in Setup";
+    find("scope-source-name").textContent = w.config.posthog.projectId ? `PostHog project ${w.config.posthog.projectId}, ${region}` : "PostHog, no project chosen yet";
     find("scout-custom-dates").hidden = draft.period !== "custom";
     const available = w.confirmed ? w.moneyPaths || [] : [], selected = Array.isArray(draft.focus) ? draft.focus : [];
     const paths = [...new Set([...available, ...selected])];
-    updateMarkup(find("scout-paths"), paths.map(path => `<label class="scope-path" data-key="${escape(path)}"><input type="checkbox" data-focus value="${escape(path)}" ${selected.includes(path) ? "checked" : ""} ${!available.includes(path) ? "disabled" : ""}><span>${escape(path)}${!available.includes(path) ? " · review in Setup" : ""}</span></label>`).join(""));
+    updateMarkup(find("scout-paths"), paths.map(path => `<label class="checkbox scope-path" data-key="${escape(path)}"><input type="checkbox" data-focus value="${escape(path)}" ${selected.includes(path) ? "checked" : ""} ${!available.includes(path) ? "disabled" : ""}><span><code>${escape(path)}</code>${!available.includes(path) ? " (review in Setup)" : ""}</span></label>`).join(""));
     find("scout-paths").hidden = draft.focus === "all";
     find("scout-focus-help").textContent = available.length ? "" : "Confirm money paths in Setup.";
     const allowed = SCOUT_SKILLS[draft.skill || "friction"]?.checks || SCOUT_CHECKS.map(row => row.id);

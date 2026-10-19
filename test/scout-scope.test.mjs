@@ -34,7 +34,7 @@ test("relative periods use complete UTC days and equal previous periods", () => 
     assert.equal(Date.parse(w.start) - Date.parse(w.baselineStart), days * 86_400_000);
     assert.equal(Date.parse(w.end) - Date.parse(w.historyStart), Math.max(30, days * 2) * 86_400_000);
   }
-  assert.equal(windowLabel(scoutWindow(opts, now)), "2026-08-29 to 2026-09-04 · UTC");
+  assert.equal(windowLabel(scoutWindow(opts, now)), "2026-08-29 to 2026-09-04, UTC");
   assert.equal(scoutWindow(opts, "2026-09-06T00:01Z").start, "2026-08-30T00:00:00.000Z");
 });
 
@@ -143,7 +143,7 @@ test("saved scope survives config reload and both phases keep the frozen source,
   assert.match(saved.id, /^[a-f0-9]{64}$/);
   for (const call of calls) { assert.ok(call.prompt.includes(saved.id)); assert.ok(call.prompt.includes(saved.window.start)); assert.ok(call.prompt.includes(JSON.stringify(context))); assert.doesNotMatch(call.prompt, /Different product/); }
   assert.match(calls[1].prompt, /session-1/);
-  assert.match(scopeView(saved), /PostHog · Project 123 · EU/);
+  assert.match(scopeView(saved), /PostHog project 123, EU/);
   assert.match(scopeView({ ...saved, options: { ...opts, note: "<script>bad</script>" } }), /&lt;script&gt;/);
 });
 

@@ -1,4 +1,4 @@
-import { escape, ended, labels, duration, modelLabel, modelControls, readiness, runList, findingList, reportView, prModelSummary, connectionViews, jobView, activityView } from "/views.js";
+import { escape, ended, labels, duration, modelLabel, modelControls, readiness, runList, findingList, emptyReport, reportView, prModelSummary, connectionViews, jobView, activityView, agentStatus, scoutJobLabel, date } from "/views.js";
 import { syncRequests } from "/requests.js";
 import { createRefreshScheduler } from "/refresh.js";
 import { updateMarkup, enterPage } from "/interface.js";
@@ -7,6 +7,7 @@ import { windowLabel } from "/scope.js";
 import { usagePage } from "/usage.js";
 
 const $ = id => document.getElementById(id);
+const PAGES = ["inbox", "runs", "research", "usage", "setup"];
 const storage = { get(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } }, set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} } };
 let token;
 try { token = new URLSearchParams(location.hash.slice(1)).get("token") || sessionStorage.getItem("rusubon-token"); if (token) sessionStorage.setItem("rusubon-token", token); } catch { /* A fragment token still works without browser storage. */ }
@@ -29,15 +30,17 @@ function saveSelection(value, role) { const key = role === "scout" ? selectionKe
 function busy() { return submitting || state?.jobs.some(job => !ended(job)); }
 function agentReady(value = selection) { const c = state.connections[value.runner], m = c?.models?.find(row => row.id === value.model); return state.workspace.initialized && !busy() && c?.authenticated && !c.checking && m?.available && m.efforts.includes(value.effort); }
 function prReady() { return agentReady(specSelection) && agentReady(implementationSelection); }
+const jobTitle = job => job.kind === "scout" ? scoutJobLabel(job.scoutScope) : labels[job.kind] || job.kind;
+const findingRows = () => filter === "open" ? state.reports : state.archived;
 
 function navigate(next) {
+  if (next === "findings") next = "inbox";
   const changed = next !== page;
   if (changed) scrollPositions.set(page, window.scrollY);
   page = next;
   if (page === "usage") usage.load();
   for (const section of document.querySelectorAll("main>section")) section.hidden = section.id !== `page-${page}`;
   for (const button of document.querySelectorAll("nav [data-page]")) { if (button.dataset.page === (page === "job" ? "runs" : page)) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current"); }
-  $("page-label").textContent = page === "job" ? labels[currentJob?.kind] || "Run" : page[0].toUpperCase() + page.slice(1);
   storage.set(`${selectionKey}:page`, { page: page === "job" ? "job" : page, jobId: currentJob?.id });
   if (changed && interactive) {
     enterPage($(`page-${page}`));
@@ -65,10 +68,26 @@ function permissionHelp() {
     yolo: "Skips tool permission checks. Codex also runs with full filesystem and network access.",
   }[$("permission-mode").value] || "Choose a permission mode to repair the saved setting.";
 }
+function pullStatus() {
+  const last = state.jobs.filter(job => job.kind === "inbox_pull").sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
+  if (!last) return "";
+  const text = !ended(last) ? "Pulling from PostHog" : last.status === "completed" ? `Pulled ${date(last.finishedAt || last.startedAt)}` : `Last pull ${last.status === "failed" ? "failed" : "stopped"}`;
+  return `<button type="button" class="link" data-key="pull-${escape(last.id)}" data-job="${escape(last.id)}">${escape(text)}</button>`;
+}
+function showReport() {
+  $("report-detail").innerHTML = report ? reportView(report, implementationSelection, { prReady: prReady(), busy: busy() }, specSelection) : emptyReport(findingRows(), filter === "archived");
+  $("page-inbox").classList.toggle("has-report", Boolean(report));
+}
+function closeReport({ focusRow = false } = {}) {
+  const slug = report?.slug; report = null; showReport(); renderState();
+  if (focusRow && slug) [...$("finding-list").querySelectorAll("[data-report]")].find(row => row.dataset.report === slug)?.focus({ preventScroll: true });
+}
 function renderState() {
   const w = state.workspace;
   $("repo-name").textContent = w.name; $("repo-path").textContent = w.repo;
   $("finding-count").textContent = state.reports.length || "";
+  $("open-count").textContent = state.reports.length || ""; $("archived-count").textContent = state.archived.length || "";
+  updateMarkup($("agent-status"), agentStatus(state));
   updateMarkup($("model-controls"), modelControls(state, selection));
   updateMarkup($("spec-model-controls"), modelControls(state, specSelection, "spec"));
   updateMarkup($("implementation-model-controls"), modelControls(state, implementationSelection, "implementation"));
@@ -80,29 +99,33 @@ function renderState() {
   $("readiness").textContent = ready.ready && investigation.error ? "Review scope" : ready.text;
   $("launch-help").textContent = ready.detail;
   $("scope-error").textContent = investigation.error; $("scope-error").hidden = !investigation.error;
-  $("launch-summary").textContent = investigation.scope ? `${investigation.scope.options.checks.length} checks · ${investigation.scope.paths.length} ${investigation.scope.paths.length === 1 ? "path" : "paths"} · ${windowLabel(investigation.scope.window)}` : "";
+  $("launch-summary").textContent = investigation.scope ? `${investigation.scope.options.checks.length} checks, ${investigation.scope.paths.length} ${investigation.scope.paths.length === 1 ? "path" : "paths"}, ${windowLabel(investigation.scope.window)}` : "";
   $("launch-scout").disabled = !ready.ready || !investigation.scope || submitting;
   $("model-help").textContent = selection.effort === "ultra" ? "Ultra enables automatic delegation in the connected Codex runner." : "";
   updateMarkup($("run-list"), runList(state.jobs));
-  updateMarkup($("finding-list"), findingList(filter === "open" ? state.reports : state.archived, filter === "archived"));
+  updateMarkup($("finding-list"), findingList(findingRows(), filter === "archived", report?.slug));
+  updateMarkup($("pull-status"), pullStatus());
+  $("pull-inbox").disabled = !ready.ready || submitting;
+  $("pull-inbox").title = ready.ready ? "Mirror the reports PostHog has ready into this inbox" : ready.detail;
   updateMarkup($("connections"), connectionViews(state));
-  $("context-status").textContent = w.confirmed ? "Confirmed" : "Review required";
+  $("context-status").textContent = w.confirmed ? "Confirmed" : "Review required"; $("context-status").className = `state ${w.confirmed ? "ok" : "warn"}`;
   $("setup-conflict").hidden = !setupFilled || setupRevision === w.revision;
-  $("saved-selection").textContent = `Save the current investigation and agent defaults. Scout: ${modelLabel(selection.model)} · ${selection.effort}. ${prModelSummary(specSelection, implementationSelection)}`;
+  $("saved-selection").textContent = `Saves the investigation and agent defaults. Scout ${modelLabel(selection.model)}, ${selection.effort}. ${prModelSummary(specSelection, implementationSelection)}`;
   $("save-setup").disabled = busy(); $("draft-context").disabled = !agentReady() || w.confirmed || dirtySetup;
   $("launch-issue").disabled = !prReady();
   if (!setupFilled) fillSetup();
   if (report) {
     for (const button of $("report-detail").querySelectorAll("[data-report-pr]")) button.disabled = !prReady();
     for (const button of $("report-detail").querySelectorAll("[data-report-archive]")) button.disabled = busy();
-  }
+  } else if (!$("report-detail").firstChild) showReport();
 }
 function renderJob() {
   if (!currentJob) return;
+  $("job-title").textContent = jobTitle(currentJob);
   updateMarkup($("job-detail"), jobView(currentJob));
   updateMarkup($("job-activity"), activityView(currentJob));
   syncRequests($("requests"), currentJob.requests, async (requestId, response) => { await api(`/jobs/${currentJob.id}/answer`, { requestId, response }); await refresh(); });
-  updateMarkup($("job-artifacts"), currentJob.artifacts?.length ? `<div class="section-title"><h2>Files from this run</h2><span class="caption">Available even after a stopped run</span></div><div class="artifact-links">${currentJob.artifacts.map(row => `<button type="button" class="button" data-key="${escape(row.key)}" data-artifact="${escape(row.key)}">${escape(row.label)}</button>`).join("")}</div>` : "");
+  updateMarkup($("job-artifacts"), currentJob.artifacts?.length ? `<div class="section"><div class="section-head"><h2>Files from this run</h2><span class="caption">Available even after a stopped run</span></div><div class="actions">${currentJob.artifacts.map(row => `<button type="button" class="btn" data-key="${escape(row.key)}" data-artifact="${escape(row.key)}">${escape(row.label)}</button>`).join("")}</div></div>` : "");
 }
 async function refresh() {
   if (refreshing) { refreshAgain = true; return; }
@@ -143,8 +166,8 @@ async function start(input) {
 }
 async function openReport(slug) {
   report = await api(`/reports/${encodeURIComponent(slug)}`);
-  $("report-detail").innerHTML = reportView(report, implementationSelection, { prReady: prReady(), busy: busy() }, specSelection); $("report-detail").hidden = false; $("finding-list").hidden = true;
-  $("report-detail").querySelector(".back").focus({ preventScroll: true });
+  showReport(); renderState();
+  $("report-detail").querySelector(".doc-title")?.focus({ preventScroll: true });
 }
 
 document.addEventListener("click", protect(async event => {
@@ -153,11 +176,8 @@ document.addEventListener("click", protect(async event => {
   if (d.page) { navigate(d.page); if (d.page === "setup") fillSetup(); }
   if (d.job) await openJob(d.job);
   if (d.report) await openReport(d.report);
-  if (d.filter) { filter = d.filter; report = null; $("report-detail").hidden = true; $("finding-list").hidden = false; for (const tab of document.querySelectorAll(".tabs [data-filter]")) tab.setAttribute("aria-pressed", String(tab.dataset.filter === filter)); renderState(); }
-  if (Object.hasOwn(d, "backFindings")) {
-    const slug = report?.slug; report = null; $("report-detail").hidden = true; $("finding-list").hidden = false;
-    [...$("finding-list").querySelectorAll("[data-report]")].find(row => row.dataset.report === slug)?.focus({ preventScroll: true });
-  }
+  if (d.filter) { filter = d.filter; for (const tab of document.querySelectorAll(".tabs [data-filter]")) tab.setAttribute("aria-pressed", String(tab.dataset.filter === filter)); closeReport(); }
+  if (Object.hasOwn(d, "backFindings")) closeReport({ focusRow: true });
   if (Object.hasOwn(d, "declineToggle")) { $("decline-form").hidden = !$("decline-form").hidden; if (!$("decline-form").hidden) $("decline-form").elements.reason.focus(); }
   if (d.reportPr) await start({ kind: "pr", source: { kind: "report", value: d.reportPr }, selection: implementationSelection, specSelection });
   if (d.connect) await start({ kind: d.kind, runner: d.connect });
@@ -175,6 +195,7 @@ document.addEventListener("click", protect(async event => {
 }));
 $("close-artifact").addEventListener("click", () => $("artifact-dialog").close());
 $("artifact-dialog").addEventListener("click", event => { if (event.target === $("artifact-dialog")) { const r = event.target.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) event.target.close(); } });
+$("pull-inbox").addEventListener("click", protect(() => start({ kind: "inbox_pull", selection })));
 
 for (const role of ["scout", "spec", "implementation"]) $(role === "scout" ? "model-controls" : `${role}-model-controls`).addEventListener("change", protect(async event => {
   let value = role === "scout" ? selection : role === "spec" ? specSelection : implementationSelection;
@@ -220,7 +241,9 @@ $("context-form").addEventListener("submit", protect(async event => { event.prev
 $("issue-form").addEventListener("submit", protect(async event => { event.preventDefault(); await start({ kind: "pr", selection: implementationSelection, specSelection, source: { kind: "issue", value: event.target.elements.issue.value.trim() } }); }));
 $("report-detail").addEventListener("submit", protect(async event => {
   if (event.target.id !== "decline-form") return; event.preventDefault();
-  await start({ kind: "decline", source: { kind: "report", value: report.slug }, reason: event.target.elements.reason.value }); report = null; $("report-detail").hidden = true; $("finding-list").hidden = false;
+  const slug = report.slug;
+  await start({ kind: "decline", source: { kind: "report", value: slug }, reason: event.target.elements.reason.value });
+  if (report?.slug === slug) closeReport();
 }));
 
 async function followEvents() {
@@ -228,11 +251,11 @@ async function followEvents() {
     try {
       const response = await fetch("/api/events", { headers: { "X-Rusubon-Token": token || "" } });
       if (!response.ok) throw new Error("Dashboard connection lost");
-      $("stream-label").textContent = "Local connection · live"; $("stream-icon").dataset.complete = "true";
+      $("stream-label").textContent = "Local, live"; $("stream-icon").dataset.complete = "true";
       const reader = response.body.getReader(), decoder = new TextDecoder(); let pending = "";
       while (true) { const { value, done } = await reader.read(); if (done) break; pending += decoder.decode(value, { stream: true }); let at; while ((at = pending.indexOf("\n\n")) >= 0) { const entry = pending.slice(0, at); pending = pending.slice(at + 2); if (entry.startsWith("data:")) scheduleRefresh(); } }
     } catch { /* Reconnect without discarding pending forms or run selection. */ }
-    $("stream-label").textContent = "Disconnected · reconnecting"; $("stream-icon").dataset.complete = "false";
+    $("stream-label").textContent = "Disconnected, reconnecting"; $("stream-icon").dataset.complete = "false";
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
 }
@@ -249,7 +272,9 @@ try {
   await refresh();
   const savedPage = storage.get(`${selectionKey}:page`);
   if (savedPage?.page === "job" && state.jobs.some(job => job.id === savedPage.jobId)) await openJob(savedPage.jobId);
-  else if (["runs", "findings", "research", "setup", "usage"].includes(savedPage?.page)) navigate(savedPage.page);
+  else if (savedPage?.page === "findings") navigate("inbox");
+  else if (PAGES.includes(savedPage?.page)) navigate(savedPage.page);
+  else navigate(state.reports.length ? "inbox" : "runs");
   interactive = true;
   for (const runner of ["claude", "codex"]) api("/connections/refresh", { runner }).catch(error => notice(error.message, true));
   followEvents();

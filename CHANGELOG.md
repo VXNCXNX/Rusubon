@@ -29,6 +29,17 @@ has been published yet.
   links the draft PR and releases the claim. `rusubon decline ph-<id>` forwards
   the reason as negative feedback to the scout that filed it. Rusubon never
   authors, edits, dismisses or resolves a report in PostHog.
+- Dashboard redesign. Findings became the Inbox, a two-pane page with the
+  finding list beside the report and the Research or Decline decision pinned
+  under it. PostHog mirrors show their status, priority and pull time as facts
+  instead of raw header lines. Agent and PostHog state live in the sidebar.
+  Runs, the run page, Research, Setup and Usage follow the same tokens and
+  type (docs/dashboard-design.md): hairline rules instead of cards, a serif for
+  reading, square priority stamps, light and dark, down to phone widths.
+- Dashboard inbox bridge. The "Pull from PostHog" button runs the same pull as
+  `rusubon inbox pull`, and Decline on a `ph-` report sends the same negative
+  feedback as `rusubon decline` before it archives the file. A failed send
+  leaves the report open.
 - Scouts read existing Replay Vision observations (`vision-observations-list`,
   `-get`, `-search`) instead of the retired session summary tools, and check
   `annotations-list` for a deploy on the day of a capture cliff. Context drafts
@@ -50,8 +61,7 @@ has been published yet.
 - Model availability depends on the installed runner and account. Optional
   recording and replay evidence may be unavailable for a project.
 - The inbox bridge needs the default MCP URL; a `?readonly=true` connection
-  blocks claims, PR links and feedback. The dashboard's Decline button does not
-  forward feedback to PostHog yet.
+  blocks claims, PR links and feedback.
 - Automated tests and browser QA cover the dashboard and scope handoff. A fresh
   package install, dashboard startup, and first Setup save have passed a smoke
   check. The new scope flow has not yet been verified with a live PostHog scout.
