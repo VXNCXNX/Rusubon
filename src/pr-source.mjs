@@ -1,4 +1,4 @@
-import { showReport } from "./inbox.mjs";
+import { parseReport, showReport } from "./inbox.mjs";
 import { reportSlug } from "./decline.mjs";
 
 const ISSUE_URL = /^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/i;
@@ -105,6 +105,7 @@ export function resolveIssue(issue, probes) {
 export function resolveSource(parsed, probes = {}) {
   if (parsed.kind === "report") {
     const report = showReport(parsed.slug);
+    const { posthogReport: id, posthogUrl: url } = parseReport(report.body);
     return {
       kind: "report",
       slug: report.slug,
@@ -112,6 +113,7 @@ export function resolveSource(parsed, probes = {}) {
       where: report.where,
       body: report.body,
       title: ((report.body.match(/^#\s+(.+)/m) || [])[1] || report.slug).trim(),
+      ...(id ? { posthogReport: { id, url } } : {}),
     };
   }
   return resolveIssue(parsed, probes);

@@ -10,7 +10,12 @@ export function parseReport(text, fallbackTitle = "") {
   const priority = ((text.match(/^priority:\s*(P[123])\s*$/im) || [])[1] || "").toUpperCase();
   const priorityExplanation = ((text.match(/^priority_explanation:\s*(.+)$/im) || [])[1] || "").trim();
   const actionability = ((text.match(/^actionability:\s*(\S+)/im) || [])[1] || "").trim();
-  return { title, priority, priorityExplanation, actionability };
+  // Sections can quote session text, so PostHog links only count in the header above them.
+  const header = text.split(/^## /m)[0];
+  const source = (header.match(/^source:\s*(\S+)/im) || [])[1] || "";
+  const posthogReport = (header.match(/^posthog_report:\s*(\S+)/im) || [])[1] || "";
+  const posthogUrl = (header.match(/^posthog_url:\s*(\S+)/im) || [])[1] || "";
+  return { title, priority, priorityExplanation, actionability, source, posthogReport, posthogUrl };
 }
 
 export function inboxSlug(path) {

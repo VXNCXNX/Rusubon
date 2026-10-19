@@ -6,6 +6,7 @@ import { assertPrReady, defaultProbes, redact } from "./doctor.mjs";
 import { cwd, runsDir } from "./paths.mjs";
 import { formatIssueRef, parseSource, resolveSource } from "./pr-source.mjs";
 import { buildPrPrompt } from "./pr-prompt.mjs";
+import { readRunnerJson, runBridgeStep } from "./pr-bridge.mjs";
 import { runWith } from "./runners.mjs";
 import { validateSpec, verifyImplementation } from "./pr-verification.mjs";
 import { assertReceipt, assertWorktreeMatchesHead, changedFiles, git, localPath, planHash, snapshot, specFiles } from "../skills/spec/scripts/evidence.mjs";
@@ -15,29 +16,7 @@ export { buildPrPrompt } from "./pr-prompt.mjs";
 
 /** Read a phase result, sanitize stored credentials, and validate its run identity. */
 function readResult(path, runId, source, phase) {
-  let raw;
-  try { raw = readFileSync(path, "utf8"); }
-  catch { throw new Error(`${phase} did not write a valid result for this run`); }
-  let result, original, sanitized;
-  try {
-    result = JSON.parse(raw);
-    original = JSON.stringify(result);
-    sanitized = JSON.stringify(result, (_key, value) => {
-      if (typeof value === "string") return redact(value);
-      if (value && typeof value === "object" && !Array.isArray(value)) {
-        return Object.fromEntries(Object.entries(value).map(([key, entry]) => [redact(key), entry]));
-      }
-      return value;
-    });
-  } catch {
-    // Invalid JSON cannot be safely inspected, so retain only a diagnostic.
-    writeFileSync(path, JSON.stringify({ error: "invalid phase result" }) + "\n");
-    throw new Error(`${phase} did not write a valid result for this run`);
-  }
-  if (sanitized !== original) {
-    writeFileSync(path, sanitized + "\n");
-    throw new Error(`${phase} result contained credentials; sanitized the artifact and stopped the run`);
-  }
+  const result = readRunnerJson(path, phase);
   if (result?.run_id !== runId || result.source !== source || result.phase !== phase
       || !["immediately_actionable", "requires_human_input", "not_actionable"].includes(result.verdict)
       || typeof result.reason !== "string" || !result.reason.trim()) {
@@ -153,10 +132,11 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
   const specPath = `docs/plans/${new Date().toISOString().slice(0, 10)}-${slug}-${runId}`;
   const specDir = localPath(repo, specPath);
   const closeOut = join(runDir, "close-out.md");
+  const posthog = source.posthogReport;
   onEvent({ type: "artifacts", closeOut, specPath });
   /** Write the redacted close-out and return the run outcome. */
   const finish = (verdict, reason, url) => {
-    writeFileSync(closeOut, redact(`# Research ${label}\n\nRun: ${runId}\nVerdict: ${verdict}\n\n${reason}\n\nSpec: ${specPath}\n${url ? `\nDraft PR: ${url}\n` : ""}`));
+    writeFileSync(closeOut, redact(`# Research ${label}\n\nRun: ${runId}\nVerdict: ${verdict}\n\n${reason}\n\nSpec: ${specPath}\n${posthog?.url ? `PostHog report: ${posthog.url}\n` : ""}${url ? `\nDraft PR: ${url}\n` : ""}`));
     console.log(`close-out ${relative(repo, closeOut)}`);
     return { runId, verdict, closeOut, specPath, url };
   };
@@ -180,7 +160,11 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     onEvent({ type: "phase", name, status: "completed" });
     return parsed;
   };
+  // claimId stays set while this run holds a PostHog claim that still needs releasing.
+  let claimId, url;
+  const bridge = (step, prUrl) => runBridgeStep({ step, config, reportId: posthog.id, reportUrl: posthog.url, runId, runDir: relative(repo, runDir), claimId, prUrl, run, onEvent });
   try {
+    if (posthog) claimId = (await bridge("claim")).claim_id;
     const research = await phase("research");
     assertHead(repo, head, startBranch);
     const planned = snapshot(repo);
@@ -221,12 +205,22 @@ export async function runPr({ raw, flags, config, probes = defaultProbes(), run 
     assertHead(repo, head, branch);
     await beforePublish();
     onEvent({ type: "phase", name: "Draft PR", status: "running" });
-    const url = await publish({ repo, specDir, runDir, receipt, result: implementation, branch, base, files, signal, beforePublish });
+    url = await publish({ repo, specDir, runDir, receipt, result: implementation, branch, base, files, signal, beforePublish });
     onEvent({ type: "phase", name: "Draft PR", status: "completed", url });
+    if (posthog) {
+      await bridge("attach", url);
+      claimId = undefined;
+    }
     return finish("immediately_actionable", implementation.reason, url);
   } catch (error) {
     const message = redact(error instanceof Error ? error.message : error);
-    finish("requires_human_input", message);
+    finish("requires_human_input", message, url);
     throw new Error(message);
+  } finally {
+    // Best effort: a failed release must not replace the run's own outcome.
+    if (claimId) {
+      try { await bridge("release"); }
+      catch (error) { console.log(`PostHog release failed: ${redact(error instanceof Error ? error.message : error)}`); }
+    }
   }
 }
