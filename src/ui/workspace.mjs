@@ -110,14 +110,31 @@ export function reports(repo, archived = false) {
   }).sort((a, b) => a.priority.localeCompare(b.priority) || b.modifiedAt.localeCompare(a.modifiedAt));
 }
 
+const INLINE_TAGS = ["strong", "em", "code", "a", "del", "br"];
+export function renderInline(text) {
+  return sanitizeHtml(marked.parseInline(safeText(text)), {
+    allowedTags: INLINE_TAGS, allowedAttributes: { a: ["href", "target", "rel"] }, allowedSchemes: ["https", "http"], allowProtocolRelative: false,
+    transformTags: { a: (tagName, attribs) => ({ tagName, attribs: { ...attribs, target: "_blank", rel: "noopener noreferrer" } }) },
+  });
+}
+
 export function reportDetail(repo, slug) {
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) throw new Error("Invalid report slug");
   for (const folder of ["reports", "archive"]) {
     const path = `.rusubon/inbox/${folder}/${slug}.md`;
     if (existsSync(localPath(repo, path))) {
-      const body = readLocal(repo, path);
-      const display = body.replace(/^priority:\s*P[123]\s*$/gmi, "").replace(/^actionability:\s*\S+\s*$/gmi, "").replace(/^priority_explanation:\s*(.+)$/gmi, "$1\n");
-      return { slug, path, archived: folder === "archive", ...parseReport(body, slug), body, html: renderMarkdown(display) };
+      const body = readLocal(repo, path), parsed = parseReport(body, slug);
+      // Header lines render as facts, not as prose. Sections can quote session text, so only the header counts.
+      const header = body.split(/^## /m)[0];
+      const posthog = parsed.source === "posthog" && parsed.posthogReport
+        ? { id: parsed.posthogReport, url: parsed.posthogUrl, status: (header.match(/^posthog_status:\s*(\S+)/im) || [])[1] || "", priority: ((header.match(/^posthog_priority:\s*(P[0-4])\b/im) || [])[1] || "").toUpperCase() }
+        : null;
+      const pulledAt = posthog ? (body.match(/^## Pulled\s*\n+\s*(\d{4}-\d{2}-\d{2}T[\d:.]+Z)/m) || [])[1] || "" : "";
+      let display = body.replace(/^priority:\s*P[123]\s*$/gmi, "").replace(/^actionability:\s*\S+\s*$/gmi, "").replace(/^priority_explanation:\s*.+$/gmi, "");
+      if (posthog) display = display.replace(/^(source|posthog_report|posthog_url|posthog_status|posthog_priority):\s*.*$/gmi, "").replace(/\n## Pulled\n[\s\S]*?(?=\n## |$)/, "");
+      if (parsed.title) display = display.replace(/^#\s+.+$/m, "");
+      const modifiedAt = statSync(localPath(repo, path)).mtime.toISOString();
+      return { slug, path, archived: folder === "archive", ...parsed, posthog, pulledAt, modifiedAt, body, html: renderMarkdown(display), explanationHtml: parsed.priorityExplanation ? renderInline(parsed.priorityExplanation) : "" };
     }
   }
   throw new Error("Finding not found");
