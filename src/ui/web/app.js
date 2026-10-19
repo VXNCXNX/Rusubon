@@ -185,12 +185,21 @@ document.addEventListener("click", protect(async event => {
   if (d.refresh) { await api("/connections/refresh", { runner: d.refresh }); await refresh(); }
   if (d.stop) { await api(`/jobs/${d.stop}/stop`, {}); await refresh(); }
   if (Object.hasOwn(d, "rerun")) {
+    // A job saved before a lineup change can name a model that left the allowlist.
+    const retired = [];
+    const reuse = (saved, role, current) => { if (validStored(saved, role)) return saved; retired.push(modelLabel(saved?.model)); return current; };
     if (currentJob.scoutScope) {
-      scoutControls.set(currentJob.scoutScope.options); selection = currentJob.selection;
+      scoutControls.set(currentJob.scoutScope.options); selection = reuse(currentJob.selection, "scout", selection);
       storage.set(`${selectionKey}:scope`, scoutControls.draft()); saveSelection(selection, "scout");
       renderState(); navigate("runs");
-      notice("Previous choices loaded. Review the dates and source, then launch. Relative periods move with today.");
-    } else await start({ kind: currentJob.kind, source: currentJob.source, selection: currentJob.selection, specSelection: currentJob.kind === "pr" ? currentJob.specSelection || currentJob.selection : undefined });
+      notice(`Previous choices loaded. Review the dates and source, then launch. Relative periods move with today.${retired.length ? ` ${retired[0]} is no longer offered, so the current model stays.` : ""}`);
+    } else {
+      const pr = currentJob.kind === "pr";
+      const spec = pr ? reuse(currentJob.specSelection || currentJob.selection, "spec", specSelection) : undefined;
+      const chosen = reuse(currentJob.selection, pr ? "implementation" : "scout", pr ? implementationSelection : selection);
+      await start({ kind: currentJob.kind, source: currentJob.source, selection: chosen, specSelection: spec });
+      if (retired.length) notice(`${retired.join(" and ")} no longer offered. Running with the current selection instead.`);
+    }
   }
   if (d.artifact) { const artifact = await api(`/jobs/${currentJob.id}/artifact?key=${encodeURIComponent(d.artifact)}`); $("artifact-title").textContent = artifact.label; $("artifact-body").innerHTML = artifact.html || `<pre>${escape(artifact.body)}</pre>`; $("artifact-dialog").showModal(); }
 }));
