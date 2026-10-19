@@ -18,6 +18,10 @@ has been published yet.
   money paths, selected checks, and additional context. Each run saves its scope.
 - Independent scout, spec creator, and implementation model and effort choices,
   checked against the connected runner. Fable 5.1 is opt-in for spec creation only.
+- Model lineup: Claude Haiku 5.5, Sonnet 5.5 and Opus 5.5, Codex GPT-6 Luna,
+  GPT-6.1 Sol and GPT-6 Astra, with Fable 5.1 still spec-only. A saved selection
+  on a retired model falls back to the defaults in the dashboard until setup is
+  saved again. Model rates were re-checked on October 19, 2026.
 - Live progress, agent questions and permission requests, tool activity, stop
   controls, saved artifacts, and run history.
 - Findings saved as Markdown with quantified evidence. Humans can decline a
