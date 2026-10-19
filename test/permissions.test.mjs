@@ -15,7 +15,7 @@ import { runCodex, answerCodexRequest } from "../src/ui/codex.mjs";
 import { runClaude } from "../src/ui/claude.mjs";
 import { jobView } from "../src/ui/web/views.js";
 
-const selection = { runner: "claude", model: "claude-sonnet-5", effort: "high" };
+const selection = { runner: "claude", model: "claude-sonnet-5-5", effort: "high" };
 const context = "# Product\nTest product\n# Money paths\n/checkout\n# Intentional friction\nNone\n# Out of scope\nStaging\n";
 const input = repo => ({ ...selection, projectId: "123", host: "eu", context, confirmed: true, expectedRevision: workspaceState(repo).revision });
 function fixture(t) { const repo = mkdtempSync(join(tmpdir(), "rusubon-permissions-")); t.after(() => trashFixture(repo)); return repo; }
@@ -98,7 +98,7 @@ for (const mode of [undefined, "auto", "ask", "yolo"]) test(`Codex adapter appli
     return {};
   };
   let asked = false;
-  const result = await runCodex("Test", { cwd: "/tmp", model: "gpt-5.6-luna", effort: "high", permissionMode: mode, emit: () => {}, createRpc: () => rpc, ask: async request => { asked = true; assert.equal(request.kind, "questions"); return { allow: true, answers: { product: "Checkout" } }; } });
+  const result = await runCodex("Test", { cwd: "/tmp", model: "gpt-6-luna", effort: "high", permissionMode: mode, emit: () => {}, createRpc: () => rpc, ask: async request => { asked = true; assert.equal(request.kind, "questions"); return { allow: true, answers: { product: "Checkout" } }; } });
   assert.equal(result.status, 0); assert.ok(asked);
   assert.deepEqual(calls[0].result, { answers: { product: { answers: ["Checkout"] } } });
 });
@@ -108,7 +108,7 @@ test("Codex refuses a runner that silently ignores the requested reviewer before
   rpc.initialize = async () => {};
   rpc.close = () => { closed = true; };
   rpc.request = async method => { if (method === "turn/start") turned = true; return { thread: { id: "test" }, approvalPolicy: "on-request", approvalsReviewer: "user", sandbox: { type: "workspaceWrite" } }; };
-  await assert.rejects(runCodex("Test", { cwd: "/tmp", model: "gpt-5.6-luna", effort: "high", emit: () => {}, createRpc: () => rpc }), /permission mode/);
+  await assert.rejects(runCodex("Test", { cwd: "/tmp", model: "gpt-6-luna", effort: "high", emit: () => {}, createRpc: () => rpc }), /permission mode/);
   assert.equal(turned, false); assert.ok(closed);
 });
 

@@ -46,8 +46,8 @@ test("default GitHub probes resolve issues and complete the two-phase draft-PR f
 test("a prepared worktree branch publishes against its original base and exposes phase artifacts", async () => {
   const f = setup(); git(f.repo, ["switch", "-c", "codex-ui-base-fixture"]);
   const events = [];
-  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-5.6-luna", effort: "low" }, baseBranch: "main", probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run: f.run, onEvent: event => events.push(event) });
-  assert.ok(result.url); assert.equal(f.latest.options.model, "gpt-5.6-luna"); assert.equal(f.latest.options.effort, "low");
+  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-6-luna", effort: "low" }, baseBranch: "main", probes: { ...defaultProbes(), codexAuth: () => ({ loggedIn: true }) }, run: f.run, onEvent: event => events.push(event) });
+  assert.ok(result.url); assert.equal(f.latest.options.model, "gpt-6-luna"); assert.equal(f.latest.options.effort, "low");
   const publish = f.ghCalls().find(args => args[0] === "pr" && args[1] === "create");
   assert.equal(publish[publish.indexOf("--base") + 1], "main");
   assert.ok(events.some(event => event.type === "artifacts" && event.closeOut === result.closeOut));
@@ -58,8 +58,8 @@ test("research uses the spec creator and hands its validated files to a differen
   const f = setup(), calls = [];
   RUNNERS.claude.which = () => process.execPath;
   const spec = { runner: "claude", model: "claude-fable-5-1", effort: "max" };
-  const implementation = { runner: "codex", model: "gpt-5.6-sol", effort: "high" };
-  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-5.6-luna", effort: "low", permissionMode: "ask", spec, implementation },
+  const implementation = { runner: "codex", model: "gpt-6.1-sol", effort: "high" };
+  const result = await runPr({ raw: "retry", config: { runner: "codex", model: "gpt-6-luna", effort: "low", permissionMode: "ask", spec, implementation },
     probes: { ...defaultProbes(), claudeAuth: () => ({ loggedIn: true }), codexAuth: () => ({ loggedIn: true }) },
     run: async (runner, prompt, options) => {
       calls.push({ runner, model: options.model, effort: options.effort });

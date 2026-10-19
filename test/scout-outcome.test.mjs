@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { jobView, runList, readiness } from "../src/ui/web/views.js";
 
-const selection = { runner: "codex", model: "gpt-5.6-luna", effort: "high" };
+const selection = { runner: "codex", model: "gpt-6-luna", effort: "high" };
 const job = {
   id: "ui-fixture", kind: "scout", status: "completed", selection,
   startedAt: "2026-09-05T17:19:58Z", finishedAt: "2026-09-05T17:26:57Z",

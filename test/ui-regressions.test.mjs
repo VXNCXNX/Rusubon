@@ -16,7 +16,7 @@ import { runClaude } from "../src/ui/claude.mjs";
 import { createRefreshScheduler } from "../src/ui/web/refresh.js";
 import { authorizationUrl, reportView } from "../src/ui/web/views.js";
 
-const selection = { runner: "claude", model: "claude-sonnet-5", effort: "max" };
+const selection = { runner: "claude", model: "claude-sonnet-5-5", effort: "max" };
 const context = "# Product\nFixture\n# Money paths\n/checkout\n# Intentional friction\nNone\n# Out of scope\nStaging\n";
 const helper = name => fileURLToPath(new URL(`./helpers/${name}.mjs`, import.meta.url));
 const input = repo => ({ ...selection, projectId: "123", host: "eu", context, confirmed: false, expectedRevision: workspaceState(repo).revision });
@@ -140,7 +140,7 @@ test("Claude adapter rejects drift even when the stream later reports success", 
         yield scenario === "effort" ? {...init,effort:"low"} : scenario === "missing" ? {...init,effort:undefined} : init;
         if (scenario === "fallback") yield {type:"system",subtype:"model_refusal_fallback",fallback_model:"claude-fable-5-1"};
         if (scenario === "hook") await options.hooks.Stop[0].hooks[0]({hook_event_name:"Stop",effort:{level:"low"}});
-        if (scenario === "switch") await options.hooks.PreModelSwitch[0].hooks[0]({hook_event_name:"PreModelSwitch",to_model:"claude-opus-5"});
+        if (scenario === "switch") await options.hooks.PreModelSwitch[0].hooks[0]({hook_event_name:"PreModelSwitch",to_model:"claude-opus-5-5"});
         yield success;
       })(); stream.close = () => {closed=true;}; return stream;
     };

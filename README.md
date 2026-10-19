@@ -145,19 +145,19 @@ Choose the scout's agent, model, and effort in Runs. Research has independent
 controls for the spec creator and implementation. Save setup to persist all
 three agent defaults.
 The spec creator handles research, requirements, design, and tasks. It defaults
-to GPT-5.6 Sol at `high` effort. Implementation starts a separate agent phase
+to GPT-6.1 Sol at `high` effort. Implementation starts a separate agent phase
 from the validated spec, using its own selection. The installed runner's live
 catalog must support the selection before a phase can start. The dashboard's
 allowlist is deliberately small:
 
 | Agent | Model | Allowed effort levels |
 | --- | --- | --- |
-| Claude Code | Sonnet 5 | `low`, `medium`, `high`, `xhigh`, `max` |
-| Claude Code | Opus 5 | `low`, `medium`, `high`, `xhigh`, `max` |
+| Claude Code | Haiku 5.5 | `low`, `medium`, `high`, `xhigh`, `max` |
+| Claude Code | Sonnet 5.5 | `low`, `medium`, `high`, `xhigh`, `max` |
+| Claude Code | Opus 5.5 | `low`, `medium`, `high`, `xhigh`, `max` |
 | Claude Code | Fable 5.1, spec creator only | `low`, `medium`, `high`, `xhigh`, `max` |
-| Codex | GPT-5.6 Luna | `low`, `medium`, `high`, `xhigh`, `max` |
-| Codex | GPT-5.6 Terra | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
-| Codex | GPT-5.6 Sol | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
+| Codex | GPT-6 Luna | `low`, `medium`, `high`, `xhigh`, `max` |
+| Codex | GPT-6.1 Sol | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
 | Codex | GPT-6 Astra | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
 
 Live capabilities can narrow these choices. `ultra` is a mode of the connected
@@ -168,8 +168,8 @@ excluded. Each PR run records both phase selections and reuses them on Run again
 Reported Claude model switches and effort mismatches stop the phase. Runtime
 hooks verify applied effort when the initial message omits it; a phase without
 effective model and effort evidence is not accepted as successful.
-Claude's session-review phase uses the separately saved Sonnet 5 or
-Opus 5 model at `low`. Codex and Cursor session review reuse the scout
+Claude's session-review phase uses the separately saved Haiku 5.5, Sonnet 5.5
+or Opus 5.5 model at `low`. Codex and Cursor session review reuse the scout
 model at `low`.
 
 In `rusubon.json`, the top-level `runner`, `model`, and `effort` configure the
@@ -243,14 +243,16 @@ reasoning tokens are already part of output. Input, cache reads, cache writes,
 and output have separate totals. Dates use UTC; Claude usage appears when each
 phase reports its result. Stopped runs keep whatever usage was recorded.
 
-The bundled catalog includes Fable 5.1 and GPT-6 Astra, checked against
+The bundled catalog spans Haiku 5.5 to Fable 5.1 and GPT-6 Luna to GPT-6
+Astra, checked against
 [Claude pricing](https://platform.claude.com/docs/en/about-claude/pricing) and
-[OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-6-astra)
-on September 5, 2026. Astra has a separate cache-write rate. Codex estimates
+[OpenAI model pricing](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+on October 19, 2026. Astra has a separate cache-write rate. Codex estimates
 account for the higher rate above 272K input tokens when the request counters
-are available. Missing prices, unknown Claude cache-write durations, and
-incomplete history are shown explicitly. Fast mode, tool fees, and provider
-discounts can differ from the catalog estimate.
+are available. Haiku 5.5 estimates use the higher rate above 100K prompt tokens
+when the request counters are available. Missing prices, unknown Claude
+cache-write durations, and incomplete history are shown explicitly. Fast mode,
+tool fees, and provider discounts can differ from the catalog estimate.
 
 Expand **How estimates work & model rates** to inspect the source or save rates
 for a model seen in your runs. Overrides live in `.rusubon/usage-rates.json`,

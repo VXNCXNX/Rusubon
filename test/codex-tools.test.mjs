@@ -15,7 +15,7 @@ async function harness(t, options = {}) {
   rpc.close = () => { closed = true; };
   rpc.send = message => replies.push(message);
   rpc.request = async method => method === "thread/start" ? { thread: { id: "test" }, approvalPolicy: "on-request", approvalsReviewer: "auto_review", sandbox: { type: "workspaceWrite" } } : {};
-  const done = runCodex("Scout", { cwd: "/tmp", model: "gpt-5.6-luna", effort: "high", signal: controller.signal, emit: event => events.push(event), createRpc: () => rpc, ...options })
+  const done = runCodex("Scout", { cwd: "/tmp", model: "gpt-6-luna", effort: "high", signal: controller.signal, emit: event => events.push(event), createRpc: () => rpc, ...options })
     .then(result => { outcome = result; }, error => { outcome = error; });
   t.after(async () => { controller.abort(); await done; });
   await flush();

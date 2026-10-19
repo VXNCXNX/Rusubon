@@ -5,6 +5,7 @@ import { updateMarkup, enterPage } from "/interface.js";
 import { scopeControls } from "/scope-controls.js";
 import { windowLabel } from "/scope.js";
 import { usagePage } from "/usage.js";
+import { DEFAULT_MODEL, DEFAULT_SELECTION, DEFAULT_SPEC_SELECTION, SPEC_DEFAULT_MODEL } from "/models.mjs";
 
 const $ = id => document.getElementById(id);
 const PAGES = ["inbox", "runs", "research", "usage", "setup"];
@@ -135,9 +136,9 @@ async function refresh() {
     if (!selection) {
       selectionKey = `rusubon:${state.workspace.repo}:selection`;
       const saved = storage.get(selectionKey), config = state.workspace.config;
-      selection = validStored(saved) ? saved : validStored(config) ? { runner: config.runner, model: config.model, effort: config.effort } : { runner: "claude", model: "claude-sonnet-5", effort: "high" };
+      selection = validStored(saved) ? saved : validStored(config) ? { runner: config.runner, model: config.model, effort: config.effort } : { ...DEFAULT_SELECTION };
       const savedSpec = storage.get(`${selectionKey}:spec`), savedImplementation = storage.get(`${selectionKey}:implementation`);
-      specSelection = validStored(savedSpec, "spec") ? savedSpec : validStored(config.spec, "spec") ? config.spec : { runner: "codex", model: "gpt-5.6-sol", effort: "high" };
+      specSelection = validStored(savedSpec, "spec") ? savedSpec : validStored(config.spec, "spec") ? config.spec : { ...DEFAULT_SPEC_SELECTION };
       implementationSelection = validStored(savedImplementation, "implementation") ? savedImplementation : validStored(config.implementation, "implementation") ? config.implementation : { ...selection };
       scoutControls = scopeControls($("scout-scope-controls"), storage.get(`${selectionKey}:scope`) || config.scout, value => { storage.set(`${selectionKey}:scope`, value); renderState(); });
       for (const job of state.jobs.filter(ended)) seenFinished.add(job.id);
@@ -184,12 +185,21 @@ document.addEventListener("click", protect(async event => {
   if (d.refresh) { await api("/connections/refresh", { runner: d.refresh }); await refresh(); }
   if (d.stop) { await api(`/jobs/${d.stop}/stop`, {}); await refresh(); }
   if (Object.hasOwn(d, "rerun")) {
+    // A job saved before a lineup change can name a model that left the allowlist.
+    const retired = [];
+    const reuse = (saved, role, current) => { if (validStored(saved, role)) return saved; retired.push(modelLabel(saved?.model)); return current; };
     if (currentJob.scoutScope) {
-      scoutControls.set(currentJob.scoutScope.options); selection = currentJob.selection;
+      scoutControls.set(currentJob.scoutScope.options); selection = reuse(currentJob.selection, "scout", selection);
       storage.set(`${selectionKey}:scope`, scoutControls.draft()); saveSelection(selection, "scout");
       renderState(); navigate("runs");
-      notice("Previous choices loaded. Review the dates and source, then launch. Relative periods move with today.");
-    } else await start({ kind: currentJob.kind, source: currentJob.source, selection: currentJob.selection, specSelection: currentJob.kind === "pr" ? currentJob.specSelection || currentJob.selection : undefined });
+      notice(`Previous choices loaded. Review the dates and source, then launch. Relative periods move with today.${retired.length ? ` ${retired[0]} is no longer offered, so the current model stays.` : ""}`);
+    } else {
+      const pr = currentJob.kind === "pr";
+      const spec = pr ? reuse(currentJob.specSelection || currentJob.selection, "spec", specSelection) : undefined;
+      const chosen = reuse(currentJob.selection, pr ? "implementation" : "scout", pr ? implementationSelection : selection);
+      await start({ kind: currentJob.kind, source: currentJob.source, selection: chosen, specSelection: spec });
+      if (retired.length) notice(`${retired.join(" and ")} no longer offered. Running with the current selection instead.`);
+    }
   }
   if (d.artifact) { const artifact = await api(`/jobs/${currentJob.id}/artifact?key=${encodeURIComponent(d.artifact)}`); $("artifact-title").textContent = artifact.label; $("artifact-body").innerHTML = artifact.html || `<pre>${escape(artifact.body)}</pre>`; $("artifact-dialog").showModal(); }
 }));
@@ -202,7 +212,7 @@ for (const role of ["scout", "spec", "implementation"]) $(role === "scout" ? "mo
   const key = role === "scout" ? selectionKey : `${selectionKey}:${role}`;
   if (event.target.dataset.choice === "runner") {
     const runner = event.target.value, saved = storage.get(`${key}:${runner}`), models = state.roleModels[role][runner];
-    const first = role === "spec" ? models.find(row => row.id === (runner === "codex" ? "gpt-5.6-sol" : "claude-opus-5")) : models[0];
+    const first = models.find(row => row.id === (role === "spec" ? SPEC_DEFAULT_MODEL : DEFAULT_MODEL)[runner]) || models[0];
     value = validStored(saved, role) ? saved : { runner, model: first.id, effort: role === "spec" ? "high" : first.defaultEffort };
   } else if (event.target.dataset.choice === "model") {
     const model = state.connections[value.runner].models.find(row => row.id === event.target.value);

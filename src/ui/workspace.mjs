@@ -7,7 +7,7 @@ import { parseReport } from "../inbox.mjs";
 import { PLACEHOLDER, contextDraftPending } from "../context.mjs";
 import { missingSections, sealDraft } from "../context-draft.mjs";
 import { safeText, safeValue } from "./process.mjs";
-import { DEFAULT_SPEC_SELECTION, validateSavedSelection } from "./models.mjs";
+import { DEFAULT_READ_MODEL, DEFAULT_SELECTION, DEFAULT_SPEC_SELECTION, savedReadModel, validateSavedSelection } from "./models.mjs";
 import { DEFAULT_SCOUT, moneyPaths, scoutOptions, scoutWindow } from "../scout-scope.mjs";
 import { resolvePermissionMode } from "../permissions.mjs";
 
@@ -67,7 +67,7 @@ export function workspaceState(repo) {
   const snapshot = setupSnapshot(repo), context = safeText(snapshot.context || "");
   let raw = {}, error = "";
   try { raw = safeValue(JSON.parse(snapshot.config || "{}")); } catch { error = "rusubon.json contains invalid JSON"; }
-  const config = { posthog: { projectId: String(raw.posthog?.projectId || ""), host: raw.posthog?.host || "" }, runner: raw.runner || "claude", model: raw.model || "claude-sonnet-5", effort: raw.effort || "high", read: { model: raw.read?.model || "claude-sonnet-5", effort: raw.read?.effort || "low" } };
+  const config = { posthog: { projectId: String(raw.posthog?.projectId || ""), host: raw.posthog?.host || "" }, runner: raw.runner || DEFAULT_SELECTION.runner, model: raw.model || DEFAULT_SELECTION.model, effort: raw.effort || DEFAULT_SELECTION.effort, read: { model: savedReadModel(raw.read?.model), effort: raw.read?.effort || "low" } };
   config.spec = raw.spec || { ...DEFAULT_SPEC_SELECTION };
   config.implementation = raw.implementation || { runner: config.runner, model: config.model, effort: config.effort };
   config.scout = raw.scout || DEFAULT_SCOUT;
@@ -90,7 +90,7 @@ export function saveSetup(repo, input) {
   const context = input.confirmed ? `${body}\n` : sealDraft(body);
   let existing = {}; try { existing = JSON.parse(snapshot.config || "{}"); } catch { throw new Error("Fix invalid rusubon.json before saving setup"); }
   const permissionMode = resolvePermissionMode(input.permissionMode === undefined ? existing.permissionMode : input.permissionMode);
-  const read = validateSavedSelection({ runner: "claude", model: input.readModel || "claude-sonnet-5", effort: "low" });
+  const read = validateSavedSelection({ runner: "claude", model: input.readModel || DEFAULT_READ_MODEL, effort: "low" });
   const spec = validateSavedSelection(input.spec || existing.spec || DEFAULT_SPEC_SELECTION, "spec");
   const implementation = validateSavedSelection(input.implementation || existing.implementation || selection, "implementation");
   const scout = input.scout || existing.scout ? scoutOptions(input.scout || existing.scout) : undefined;

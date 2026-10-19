@@ -29,7 +29,7 @@ import { assertClaudeSelection, claudeOptions, isOfficialPosthog } from "../src/
 import { modelControls, jobView } from "../src/ui/web/views.js";
 
 const worker = fileURLToPath(new URL("./helpers/ui-worker.mjs", import.meta.url));
-const selection = { runner: "claude", model: "claude-sonnet-5", effort: "high" };
+const selection = { runner: "claude", model: "claude-sonnet-5-5", effort: "high" };
 const saveSetup = (repo, input) => saveSetupAtRevision(repo, { expectedRevision: workspaceState(repo).revision, ...input });
 const context = "# Product\nTest product.\n\n# Money paths\n/checkout\n\n# Intentional friction\nPaywall.\n\n# Out of scope\nStaging.\n";
 function fixture(t) { const repo = mkdtempSync(join(tmpdir(), "rusubon-ui-")); t.after(() => trashFixture(repo)); return repo; }
@@ -47,7 +47,7 @@ test("model choices intersect live capabilities and never offer Fable, aliases o
   }
   assert.throws(() => validateSavedSelection({ runner: "claude", model: "claude-fable-5", effort: "low" }));
   assert.throws(() => validateSavedSelection({ runner: "claude", model: "default", effort: "high" }));
-  for (const model of ["claude-opus-5", "claude-sonnet-5", "gpt-5.6-luna"]) assert.throws(() => validateSavedSelection({ runner: model.startsWith("gpt") ? "codex" : "claude", model, effort: "ultra" }));
+  for (const model of ["claude-opus-5-5", "claude-sonnet-5-5", "gpt-6-luna"]) assert.throws(() => validateSavedSelection({ runner: model.startsWith("gpt") ? "codex" : "claude", model, effort: "ultra" }));
   const narrowed = availableModels("codex", [{ model: "gpt-6-astra", supportedReasoningEfforts: [{ reasoningEffort: "low" }] }]);
   assert.throws(() => validateSelection({ runner: "codex", model: "gpt-6-astra", effort: "ultra" }, narrowed));
   assert.deepEqual(narrowed.at(-1).efforts, ["low"]);
@@ -72,7 +72,7 @@ test("Claude refuses reported effort drift, parent model switches and fallback e
   const selected = { model: "claude-fable-5-1", effort: "max" };
   assert.doesNotThrow(() => assertClaudeSelection({ type: "system", subtype: "init", model: selected.model, effort: "max" }, selected));
   assert.throws(() => assertClaudeSelection({ type: "system", subtype: "init", model: selected.model, effort: "low" }, selected), /effort instead of max/);
-  assert.throws(() => assertClaudeSelection({ type: "assistant", message: { model: "claude-opus-5" } }, selected), /instead of/);
+  assert.throws(() => assertClaudeSelection({ type: "assistant", message: { model: "claude-opus-5-5" } }, selected), /instead of/);
   assert.throws(() => assertClaudeSelection({ type: "system", subtype: "model_refusal_fallback", fallback_model: "claude-fable-5-1" }, selection), /fell back/);
   assert.deepEqual(claudeOptions("/tmp").settings.fallbackModel, []);
 });
@@ -101,12 +101,12 @@ test("setup preserves human confirmation and existing config, rejects invalid mo
 
 test("saved scout, spec and implementation defaults remain independent across reloads", t => {
   const repo = fixture(t), original = process.cwd(); process.chdir(repo); t.after(() => process.chdir(original));
-  const spec = { runner: "claude", model: "claude-fable-5-1", effort: "max" }, implementation = { runner: "codex", model: "gpt-5.6-luna", effort: "medium" };
+  const spec = { runner: "claude", model: "claude-fable-5-1", effort: "max" }, implementation = { runner: "codex", model: "gpt-6-luna", effort: "medium" };
   const input = { ...selection, spec, implementation, projectId: "123", host: "eu", context, confirmed: true };
   saveSetup(repo, input);
-  saveSetup(repo, { ...input, runner: "codex", model: "gpt-5.6-terra", effort: "low", spec: undefined, implementation: undefined });
+  saveSetup(repo, { ...input, runner: "codex", model: "gpt-6.1-sol", effort: "low", spec: undefined, implementation: undefined });
   const loaded = loadConfig();
-  assert.equal(loaded.model, "gpt-5.6-terra"); assert.deepEqual(loaded.spec, spec); assert.deepEqual(loaded.implementation, implementation);
+  assert.equal(loaded.model, "gpt-6.1-sol"); assert.deepEqual(loaded.spec, spec); assert.deepEqual(loaded.implementation, implementation);
   assert.deepEqual(workspaceState(repo).config.spec, spec); assert.deepEqual(workspaceState(repo).config.implementation, implementation);
   assert.throws(() => saveSetup(repo, { ...input, implementation: spec }));
   assert.deepEqual(loadConfig().implementation, implementation);
@@ -238,7 +238,7 @@ test("HTTP authenticates every API, rejects cross-origin writes, serves assets, 
   const artifact = await (await request(`/api/jobs/${job.id}/artifact?key=Run%2Fclose-out.md`)).json(); assert.match(artifact.html, /No qualifying findings/);
   assert.equal((await request(`/api/jobs/${job.id}/artifact?key=../secrets`)).status, 400);
   await waitFor(() => !jobs.active.size);
-  const implementation = { runner: "codex", model: "gpt-5.6-luna", effort: "low" };
+  const implementation = { runner: "codex", model: "gpt-6-luna", effort: "low" };
   const launched = await request("/api/jobs", { kind: "pr", selection: implementation, specSelection, source: { kind: "issue", value: "#1" } });
   assert.equal(launched.status, 202);
   const pr = await launched.json();
@@ -248,7 +248,7 @@ test("HTTP authenticates every API, rejects cross-origin writes, serves assets, 
   const restored = new Jobs(repo).detail(pr.id);
   assert.deepEqual(restored.specSelection, specSelection); assert.deepEqual(restored.selection, implementation);
   assert.match(jobView(restored), /Spec Claude Code, Fable 5.1, max/);
-  assert.match(jobView(restored), /Build Codex, GPT-5.6 Luna, low/);
+  assert.match(jobView(restored), /Build Codex, GPT-6 Luna, low/);
 });
 
 test("Codex RPC paginates, routes notifications and approvals, rejects errors and closed connections", async t => {
@@ -272,7 +272,7 @@ test("Codex approval answers preserve protocol shapes and fail closed on unsuppo
 
 test("async scout phases use isolated run files and the configured low-effort read model", async t => {
   const repo = fixture(t), original = process.cwd(); process.chdir(repo); t.after(() => process.chdir(original));
-  initConfig(); saveSetup(repo, { ...selection, permissionMode: "yolo", projectId: "123", host: "eu", context, confirmed: true, readModel: "claude-opus-5" });
+  initConfig(); saveSetup(repo, { ...selection, permissionMode: "yolo", projectId: "123", host: "eu", context, confirmed: true, readModel: "claude-opus-5-5" });
   writeLocal(repo, candidatesRel("friction"), JSON.stringify({ ids: [{ id: "stale-session" }] }));
   const config = loadConfig(), calls = [], phases = [];
   const probes = { which: () => "/usr/bin/claude", claudeAuth: () => ({ loggedIn: true }), claudeMcpList: () => "posthog: connected" };
@@ -284,7 +284,7 @@ test("async scout phases use isolated run files and the configured low-effort re
   };
   const result = await runSkill("friction", config, probes, { run, runId: "ui-test", onEvent: event => phases.push(event) });
   assert.equal(result.closeOut, ".rusubon/runs/ui-test/close-out.md"); assert.equal(calls.length, 2);
-  assert.equal(calls[0].options.model, "claude-sonnet-5"); assert.equal(calls[1].options.model, "claude-opus-5"); assert.equal(calls[1].options.effort, "low");
+  assert.equal(calls[0].options.model, "claude-sonnet-5-5"); assert.equal(calls[1].options.model, "claude-opus-5-5"); assert.equal(calls[1].options.effort, "low");
   assert.ok(calls.every(call => call.options.permissionMode === "yolo"));
   assert.match(calls[1].prompt, /fresh-session/); assert.doesNotMatch(calls[1].prompt, /stale-session/);
   assert.equal(phases.at(-1).status, "completed");

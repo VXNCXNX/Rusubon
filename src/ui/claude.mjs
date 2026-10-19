@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { pkgRoot } from "../config.mjs";
-import { availableModels, canonicalClaudeModel, SPEC_MODEL_ALLOWLIST } from "./models.mjs";
+import { availableModels, canonicalClaudeModel, DEFAULT_MODEL, MODEL_ALLOWLIST, SPEC_MODEL_ALLOWLIST } from "./models.mjs";
 import { command, inputQueue, safeText } from "./process.mjs";
 import { claudePermissions } from "../permissions.mjs";
 
@@ -8,8 +8,8 @@ export function claudeOptions(cwd, extra = {}) {
   return {
     cwd, pathToClaudeCodeExecutable: process.env.RUSUBON_CLAUDE || "claude",
     settingSources: ["user", "project", "local"], persistSession: false,
-    model: "claude-sonnet-5", permissionMode: "default",
-    settings: { availableModels: ["claude-sonnet-5", "claude-opus-5"], fallbackModel: [] },
+    model: DEFAULT_MODEL.claude, permissionMode: "default",
+    settings: { availableModels: MODEL_ALLOWLIST.claude.map(row => row.id), fallbackModel: [] },
     ...extra,
   };
 }
