@@ -144,7 +144,8 @@ function checkRunner(config, probes) {
   }
   const spec = RUNNERS[name];
   if (!spec) return { name: "runner", ok: false, detail: `unknown runner '${name}'` };
-  const bin = spec.which();
+  // The runner's own lookup honors test overrides; the probe honors stubbed PATHs.
+  const bin = spec.which() || spec.bins.map((candidate) => probes.which(candidate)).find(Boolean);
   if (!bin) {
     return {
       name: "runner",

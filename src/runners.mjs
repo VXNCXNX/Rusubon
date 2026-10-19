@@ -10,6 +10,9 @@ function which(bin) {
   return r.status === 0 ? r.stdout.trim() : "";
 }
 
+/** Binaries that can serve each runner, first match wins. */
+export const RUNNER_BINS = { claude: ["claude"], cursor: ["cursor", "agent"], codex: ["codex"] };
+
 function writePrompt(prompt) {
   const file = join(tmpdir(), `rusubon-prompt-${Date.now()}.md`);
   writeFileSync(file, prompt);
@@ -29,6 +32,7 @@ function spawnOpts(opts, extra = {}) {
 export const RUNNERS = {
   claude: {
     which: () => which("claude"),
+    bins: RUNNER_BINS.claude,
     warn() {
       if (process.env.ANTHROPIC_API_KEY) {
         console.warn(
@@ -49,6 +53,7 @@ export const RUNNERS = {
   },
   cursor: {
     which: () => which("cursor") || which("agent"),
+    bins: RUNNER_BINS.cursor,
     run(prompt, opts = {}) {
       const bin = which("agent") ? "agent" : "cursor";
       const file = writePrompt(prompt);
@@ -57,6 +62,7 @@ export const RUNNERS = {
   },
   codex: {
     which: () => which("codex"),
+    bins: RUNNER_BINS.codex,
     run(prompt, opts = {}) {
       const file = writePrompt(prompt);
       const mode = resolvePermissionMode(opts.permissionMode), permissions = codexPermissions(mode);
