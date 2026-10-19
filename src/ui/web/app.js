@@ -248,6 +248,12 @@ $("load-current-setup").addEventListener("click", protect(async () => {
   renderState(); notice("Loaded current setup. Review it before saving.");
 }));
 $("context-form").addEventListener("submit", protect(async event => { event.preventDefault(); await start({ kind: "context", selection, about: event.target.elements.about.value }); }));
+const THEME_KEY = "rusubon:theme";
+function applyTheme(value) { if (value === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = value; }
+const savedTheme = storage.get(THEME_KEY);
+$("theme-select").value = ["light", "dark"].includes(savedTheme) ? savedTheme : "system";
+applyTheme($("theme-select").value);
+$("theme-select").addEventListener("change", event => { storage.set(THEME_KEY, event.target.value); applyTheme(event.target.value); });
 $("issue-form").addEventListener("submit", protect(async event => { event.preventDefault(); await start({ kind: "pr", selection: implementationSelection, specSelection, source: { kind: "issue", value: event.target.elements.issue.value.trim() } }); }));
 $("report-detail").addEventListener("submit", protect(async event => {
   if (event.target.id !== "decline-form") return; event.preventDefault();
