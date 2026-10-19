@@ -22,6 +22,8 @@ export const DEFAULT_MODEL = { claude: "claude-sonnet-5-5", codex: "gpt-6.1-sol"
 export const SPEC_DEFAULT_MODEL = { claude: "claude-opus-5-5", codex: "gpt-6.1-sol" };
 export const DEFAULT_SELECTION = { runner: "claude", model: DEFAULT_MODEL.claude, effort: "high" };
 export const DEFAULT_READ_MODEL = DEFAULT_MODEL.claude;
+// rusubon.json can still name a read model from an earlier lineup until Setup is saved again.
+export const savedReadModel = id => MODEL_ALLOWLIST.claude.some(row => row.id === id) ? id : DEFAULT_READ_MODEL;
 export const DEFAULT_SPEC_SELECTION = { runner: "codex", model: SPEC_DEFAULT_MODEL.codex, effort: "high" };
 
 function roleModels(role) {

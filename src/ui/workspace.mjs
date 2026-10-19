@@ -7,7 +7,7 @@ import { parseReport } from "../inbox.mjs";
 import { PLACEHOLDER, contextDraftPending } from "../context.mjs";
 import { missingSections, sealDraft } from "../context-draft.mjs";
 import { safeText, safeValue } from "./process.mjs";
-import { DEFAULT_READ_MODEL, DEFAULT_SELECTION, DEFAULT_SPEC_SELECTION, validateSavedSelection } from "./models.mjs";
+import { DEFAULT_READ_MODEL, DEFAULT_SELECTION, DEFAULT_SPEC_SELECTION, savedReadModel, validateSavedSelection } from "./models.mjs";
 import { DEFAULT_SCOUT, moneyPaths, scoutOptions, scoutWindow } from "../scout-scope.mjs";
 import { resolvePermissionMode } from "../permissions.mjs";
 
@@ -67,7 +67,7 @@ export function workspaceState(repo) {
   const snapshot = setupSnapshot(repo), context = safeText(snapshot.context || "");
   let raw = {}, error = "";
   try { raw = safeValue(JSON.parse(snapshot.config || "{}")); } catch { error = "rusubon.json contains invalid JSON"; }
-  const config = { posthog: { projectId: String(raw.posthog?.projectId || ""), host: raw.posthog?.host || "" }, runner: raw.runner || DEFAULT_SELECTION.runner, model: raw.model || DEFAULT_SELECTION.model, effort: raw.effort || DEFAULT_SELECTION.effort, read: { model: raw.read?.model || DEFAULT_READ_MODEL, effort: raw.read?.effort || "low" } };
+  const config = { posthog: { projectId: String(raw.posthog?.projectId || ""), host: raw.posthog?.host || "" }, runner: raw.runner || DEFAULT_SELECTION.runner, model: raw.model || DEFAULT_SELECTION.model, effort: raw.effort || DEFAULT_SELECTION.effort, read: { model: savedReadModel(raw.read?.model), effort: raw.read?.effort || "low" } };
   config.spec = raw.spec || { ...DEFAULT_SPEC_SELECTION };
   config.implementation = raw.implementation || { runner: config.runner, model: config.model, effort: config.effort };
   config.scout = raw.scout || DEFAULT_SCOUT;
